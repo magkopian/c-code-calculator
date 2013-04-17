@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 /*error report table*/
 char error_log[10000] = "No Errors.\n";
@@ -15,7 +16,7 @@ struct instruction {
 typedef struct instruction instruction;
 
 /*put's instructions in a buffer, separated with semicolons*/
-void get_instructions(char *buffer);
+void get_instructions(char *buffer, FILE *fp);
 
 /*extracts instructions from buffer*/
 int extract_instructions(char *buffer, instruction *inst);
@@ -44,15 +45,28 @@ void generate_code(instruction *inst, char *code, int int_num);
 /*generate c file with the code*/
 void save_code(char *code);
 
-int main(void) {
+int main(int argc, char **argv) {
 	char buffer[10000];
 	int int_num;
 	int i;
 	int num;
 	instruction inst[1000];
 	char code[2000];
+	FILE *fp;
+
+	if (argc != 2) { //check if the number of arguments is right
+		puts("Invalid argument number.");
+		exit(-1);
+	}
+	else if ((fp = fopen(argv[1], "r")) == NULL) { //try to open the input file
+		printf("%s\n", strerror(errno));
+		exit(-2);
+	}
+	else {
+		get_instructions(buffer, fp); //read the input file
+		close(fp);
+	}
 	
-	get_instructions(buffer);
 	int_num = extract_instructions(buffer, inst);
 	
 	if (int_num == -1) {
@@ -85,13 +99,12 @@ int main(void) {
 	return 0;
 }
 
-void get_instructions(char *buffer) {
+void get_instructions(char *buffer, FILE *fp) {
 	int i = 0;
 	int line_len;
 	
-	
-	for(i = 0; ; i += line_len) {
-		fgets(&buffer[i], 1000, stdin); //max 1000 chars each line
+	for(i = 0; !feof(fp); i += line_len) {
+		fgets(&buffer[i], 1000, fp); //max 1000 chars each line
 		line_len = strlen(&buffer[i]);
 		
 		//discard null lines
@@ -234,14 +247,8 @@ int optimize(instruction *inst, int int_num) {
 	}
 
 
-	for (i = 0; i < int_num; ++i) { //optimize res + 1 and res - 1 to ++res and --res
-		if (buff[i].op == '+' && buff[i].val == 1) {
-			buff[i].op = '['; // '[' -> ++res
-		}
-		else if (buff[i].op == '-' && buff[i].val == 1) {
-			buff[i].op = ']'; // ']' -> --res
-		}
-		else if (buff[i].op == '*' && is_power_of_2(buff[i].val)) {
+	for (i = 0; i < int_num; ++i) { //optimize for powers of two
+		if (buff[i].op == '*' && is_power_of_2(buff[i].val)) {
 			buff[i].op = '<'; // '<' -> res <<= x
 			buff[i].val = shift_times(buff[i].val);
 		}
@@ -299,14 +306,6 @@ void generate_code(instruction *inst, char *code, int int_num) {
 			case '>':
 				operation[k++] = '>';
 				operation[k++] = '>';
-				break;
-			case '[':
-				strcpy(&prebuff[z], "\n\t++result;");
-				z = strlen(prebuff);
-				break;
-			case ']':
-				strcpy(&prebuff[z], "\n\t--result;");
-				z = strlen(prebuff);
 				break;
 			default:
 				operation[k++] = inst[i].op;
