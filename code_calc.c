@@ -43,7 +43,7 @@ int shift_times(int x);
 void generate_code(instruction *inst, char *code, int int_num);
 
 /*generate c file with the code*/
-void save_code(char *code);
+void save_code(char *code, char *fout);
 
 int main(int argc, char **argv) {
 	char buffer[10000];
@@ -54,8 +54,9 @@ int main(int argc, char **argv) {
 	char code[2000];
 	FILE *fp;
 
-	if (argc != 2) { //check if the number of arguments is right
-		puts("Invalid argument number.");
+
+	if (argc < 2) { //check if the number of arguments is correct
+		puts("No input file has been specified.");
 		exit(-1);
 	}
 	else if ((fp = fopen(argv[1], "r")) == NULL) { //try to open the input file
@@ -63,20 +64,31 @@ int main(int argc, char **argv) {
 		exit(-2);
 	}
 	else {
-		get_instructions(buffer, fp); //read the input file
+		get_instructions(buffer, fp); //put instuctions from the input file to the buffer
 		close(fp);
 	}
+
 	
-	int_num = extract_instructions(buffer, inst);
+	int_num = extract_instructions(buffer, inst); //extract instuctions from the buffer
 	
 	if (int_num == -1) {
-		puts("No input. Nothing to do.");
+		puts("No instructions found in the file.");
+		exit(-3);
 	}
-	else {
-		puts(error_log); //print error log
-		int_num = optimize(inst, int_num); //instruction opimization
+	else { //if everything is ok
+		puts(error_log); //print error log (or "No Errors" message if there isn't any)
+		
+		int_num = optimize(inst, int_num); //do instruction opimization
 		generate_code(inst, code, int_num); //generate c code
-		save_code(code);
+		
+		
+		//check if output file has been specified
+		if (argc == 4 && strcmp(argv[2], "-o") == 0) {
+			save_code(code, argv[3]);
+		}
+		else {
+			save_code(code, "out.c");
+		}
 		
 		/*print tokens (for debugging)
 		putchar('\n');
@@ -87,15 +99,7 @@ int main(int argc, char **argv) {
 		putchar('\n');
 		*/
 		
-		//for (i = 0; i < int_num; ++i) {
-		//	if (inst[i].op != '!') {
-		//		num = do_operation(inst[i].op, inst[i].val);
-		//	}
-		//}
-		
-		//printf("Result: %d\n", num);
 	}
-	
 	return 0;
 }
 
@@ -204,27 +208,6 @@ instruction parse_line(char *line, int line_len, int k) {
 	}
 	
 	return inst;
-}
-
-int do_operation(char op, int val) {
-	int static num = 0;
-	
-	switch(op) {
-		case '+':
-			num += val;
-			break;
-		case '-':
-			num -= val;
-			break;
-		case '*':
-			num *= val;
-			break;
-		case '/':
-			num /= val;
-			break;
-	}
-	
-	return num;
 }
 
 int optimize(instruction *inst, int int_num) {
@@ -336,24 +319,16 @@ void generate_code(instruction *inst, char *code, int int_num) {
 }
 
 
-void save_code(char *code) {
+void save_code(char *code, char *fout) {
 	FILE *fp;
-	int i;
-	char fname[256];
-	
-	//ask user for a filename
-	puts("Give name for the output file:");
-	fgets(fname, 256, stdin);
-	i = strlen(fname);
-	fname[i-1] = '\0'; //remove \n char
 
-	if (!(fp = fopen(fname, "w"))) {
-		printf("Can't create file with name %s.\n", fname);
+	if (!(fp = fopen(fout, "w"))) {
+		printf("%s\n", strerror(errno));
 		exit(-1);
 	}
 	
 	fputs(code, fp); //write the code to the file
-	printf("File %s has been created.\n", fname);
+	printf("File %s has been created.\n", fout);
 	fclose(fp);
 }
 
