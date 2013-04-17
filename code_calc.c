@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*error report table*/
 char error_log[10000] = "No Errors.\n";
-int e_i = 0;
+int e_i = 0; //error counter
 
+/*the struct for the instruction token*/
 struct instruction {
 	char op; //operator
 	int val; //value
@@ -18,11 +20,29 @@ void get_instructions(char *buffer);
 /*extracts instructions from buffer*/
 int extract_instructions(char *buffer, instruction *inst);
 
-int llen(char *str);
+/*return length of instruction*/
+inline int llen(char *str);
 
+/*parse line and extract instruction tokens*/
 instruction parse_line(char *line, int line_len, int k);
 
+/*execute an instruction*/
 int do_operation(char op, int val);
+
+/*optimize the instructions and return number of instructions after optimization*/
+int optimize(instruction *inst, int int_num);
+
+/*check if an integer is power of 2*/
+inline int is_power_of_2(int x);
+
+/*return shift equiv for power of 2 div or mul*/
+int shift_times(int x);
+
+/*generate the c code based on the instruction tokens*/
+void generate_code(instruction *inst, char *code, int int_num);
+
+/*generate c file with the code*/
+void save_code(char *code);
 
 int main(void) {
 	char buffer[10000];
@@ -30,6 +50,7 @@ int main(void) {
 	int i;
 	int num;
 	instruction inst[1000];
+	char code[2000];
 	
 	get_instructions(buffer);
 	int_num = extract_instructions(buffer, inst);
@@ -38,15 +59,27 @@ int main(void) {
 		puts("No input. Nothing to do.");
 	}
 	else {
-		puts(error_log);
-	
-		for (i = 0; i < int_num; ++i) {
-			if (inst[i].op != '!') {
-				num = do_operation(inst[i].op, inst[i].val);
-			}
-		}
+		puts(error_log); //print error log
+		int_num = optimize(inst, int_num); //instruction opimization
+		generate_code(inst, code, int_num); //generate c code
+		save_code(code);
 		
-		printf("Result: %d\n", num);
+		/*print tokens (for debugging)
+		putchar('\n');
+		for (i = 0; i < int_num; ++i) {
+			printf("%c %d\n", inst[i].op, inst[i].val);
+		}
+		putchar('\n');
+		putchar('\n');
+		*/
+		
+		//for (i = 0; i < int_num; ++i) {
+		//	if (inst[i].op != '!') {
+		//		num = do_operation(inst[i].op, inst[i].val);
+		//	}
+		//}
+		
+		//printf("Result: %d\n", num);
 	}
 	
 	return 0;
@@ -94,7 +127,7 @@ int extract_instructions(char *buffer, instruction *inst) {
 	return k; //return num of instructions
 }
 
-int llen(char *str) {
+inline int llen(char *str) {
 	int i;
 	for (i = 0; str[i] != ';'; ++i);
 	return i;
@@ -180,4 +213,164 @@ int do_operation(char op, int val) {
 	
 	return num;
 }
+
+int optimize(instruction *inst, int int_num) {
+	int i, k, z;
+	instruction buff[int_num];
+
+	for (i = 0, z = -1; i < int_num; ++i) { //find the last result *= 0
+		if (inst[i].op == '*' && inst[i].val == 0) {
+			z = i;
+		}
+	}
+
+	for (i = z + 1, k = 0; i < int_num; ++i) { //start after the last *= 0
+		if (inst[i].op != '!' && !((inst[i].op == '+' || inst[i].op == '-') && inst[i].val == 0) &&
+				!((inst[i].op == '*' || inst[i].op == '/') && inst[i].val == 1) ) { //drop dead operations
+
+			buff[k].op = inst[i].op;
+			buff[k++].val = inst[i].val;
+		}
+	}
+
+
+	for (i = 0; i < int_num; ++i) { //optimize res + 1 and res - 1 to ++res and --res
+		if (buff[i].op == '+' && buff[i].val == 1) {
+			buff[i].op = '['; // '[' -> ++res
+		}
+		else if (buff[i].op == '-' && buff[i].val == 1) {
+			buff[i].op = ']'; // ']' -> --res
+		}
+		else if (buff[i].op == '*' && is_power_of_2(buff[i].val)) {
+			buff[i].op = '<'; // '<' -> res <<= x
+			buff[i].val = shift_times(buff[i].val);
+		}
+		else if (buff[i].op == '/' && is_power_of_2(buff[i].val)) {
+			buff[i].op = '>'; // '>' -> res >>= x
+			buff[i].val = shift_times(buff[i].val);
+		}
+	}
+
+	for (i = 0; i < k; ++i) {
+		inst[i] = buff[i];
+	}
+	return k;
+}
+
+inline int is_power_of_2(int x) {
+	if (x == 1 || x == 2 || x == 4 || x == 8 || x == 16 || x == 32 || x == 64 || x == 128 || x == 256 || x == 512 || x == 1024) {
+		return 1;
+	}
+	return 0;
+}
+
+int shift_times(int x) {
+	int i, k;
+	for (i = 1, k = 0; i < x; i *= 2, ++k);
+	
+	if (i == x) { //if x was a valid power of 2, after the end of the for loop
+		return k; //the i must be equal with x, in that case return k
+	}
+	else {
+		return -1; //else return -1 to indicate wrong input
+	}
+}
+
+void generate_code(instruction *inst, char *code, int int_num) {
+	int i, k, z;
+	char operation[1000];
+	char tmp[1000];
+	char prebuff[1000];
+	
+	for (i = 0, k = 0; i < int_num; ++i) {//put int_num brackets on the left
+		if (inst[i].op != '[' && inst[i].op != ']') {
+			operation[k++] = '(';
+		}
+	}
+	operation[k++] = '0';
+	
+	for (i = 0, z = 0; i < int_num; ++i) {
+		
+		switch(inst[i].op) {
+			case '<':
+				operation[k++] = '<';
+				operation[k++] = '<';
+				break;
+			case '>':
+				operation[k++] = '>';
+				operation[k++] = '>';
+				break;
+			case '[':
+				strcpy(&prebuff[z], "\n\t++result;");
+				z = strlen(prebuff);
+				break;
+			case ']':
+				strcpy(&prebuff[z], "\n\t--result;");
+				z = strlen(prebuff);
+				break;
+			default:
+				operation[k++] = inst[i].op;
+				break;
+		}
+		
+		if (inst[i].op != ']' && inst[i].op != '[') {
+			sprintf(tmp, "%d", inst[i].val); //convert int to string
+			strcpy(&operation[k++], tmp);
+			k += strlen(tmp) - 1;
+				
+			operation[k++] = ')';
+		}
+	}
+	prebuff[z] = '\0';
+	operation[k] = '\0';
+
+	//generate the code
+	strcpy(code, "#include <stdio.h>\n#include <stdlib.h>\nint main(void) {\n\tint result = ");
+	i = strlen(code);
+	strcpy(&code[i], operation);
+	i = strlen(code);
+	strcpy(&code[i], ";");
+	i = strlen(code);
+	strcpy(&code[i], prebuff);
+	i = strlen(code);
+	strcpy(&code[i], "\n\tprintf(\"Result = %d\\n\", result);\n}\n");
+}
+
+
+void save_code(char *code) {
+	FILE *fp;
+	int i;
+	char fname[256];
+	
+	//ask user for a filename
+	puts("Give name for the output file:");
+	fgets(fname, 256, stdin);
+	i = strlen(fname);
+	fname[i-1] = '\0'; //remove \n char
+
+	if (!(fp = fopen(fname, "w"))) {
+		printf("Can't create file with name %s.\n", fname);
+		exit(-1);
+	}
+	
+	fputs(code, fp); //write the code to the file
+	printf("File %s has been created.\n", fname);
+	fclose(fp);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
