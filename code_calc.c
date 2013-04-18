@@ -351,9 +351,10 @@ void generate_code(instruction *inst, char *code, int int_num, symbol *syms) {
 		if (syms[z+o].var == '$') { //if only result var is left, put all data in it
 			operation[z][k++] = syms[z-1+o].var;
 		}
-		else { 
+		else if (!(inst[i].op == '-' || inst[i].op == '+' || syms[z+o].op == '+' || syms[z+o].op == '-')){
 			operation[z][k++] = '0';
 		}
+		
 		++j;
 		
 		while (k != 0) {
@@ -417,7 +418,7 @@ void generate_code(instruction *inst, char *code, int int_num, symbol *syms) {
 	
 	def = 0;
 	code[i++] = syms[0].var;
-	for (j = 1; syms[j].var != '$'; ++j) {
+	for (j = 1; syms[j].var != '!'; ++j) { //scan symbols table until reach the end
 	
 		for (k = 0; k < j; ++k) { //check if var already defined
 			if (syms[k].var == syms[j].var) {
