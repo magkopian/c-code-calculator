@@ -180,6 +180,14 @@ instruction parse_line(char *line, int line_len, int k, symbol *syms) {
 	
 	inst.op = '+'; //int operator
 	
+	
+	syms[varc+1].var = '!'; //define the end of the symbols table
+	syms[varc+1].op = '!';
+	
+	syms[varc].var = '$'; //the result variable
+	syms[varc].op = '&';
+		
+		
 	if (line[0] == '=' && line[1] == ' ' && line[2] >= 'a' && line[2] <= 'z' && line[3] == ';') { //it's a var!
 		isvar = 1;
 	}
@@ -315,6 +323,165 @@ int optimize(instruction *inst, int int_num, symbol *syms) {
 	return k;
 }
 
+void generate_code(instruction *inst, char *code, int int_num, symbol *syms) {
+	int i = 0; //instuction counter
+	int k = 0; //operation line char counter
+	int z = 0; //operation counter
+	int j = 0; //instuction counter excluding assignments
+	int o = 0; //operations with var counter
+	int def = 0; //var already defined flag
+	
+	//as an operation is defined one line of C code with a var as the lvalue and mathematical proposition as the rvaule 
+	char operation[100][1000]; //max 100 operations, 1000 char each
+	char tmp[1000]; //general use temp string
+	
+	/*generate the operation lines*/
+	for (i = 0, z = 0, j = 0; i < int_num; ++z) {
+		
+		for (k = 0; j < int_num && inst[j].op != '&'; ++j, ++k) {//put int_num start brackets on the left of the operation
+			operation[z][k] = '('; //stop when assing operator or end of instuctions found
+		}
+		
+		
+		if (syms[0].var == '$') {
+			if (!(inst[i].op == '-' || inst[i].op == '+' || syms[z+o].op == '+' || syms[z+o].op == '-')){
+				operation[z][k++] = '0'; //don't put a +-0 in the start of the operation line
+			
+			}
+			else if (syms[z+o].var == '$') { //if the last operation is an assignment put the var into the result var
+				operation[z][k++] = syms[z-1+o].var;
+			}
+		}
+		else {
+			if (!(inst[i].op == '-' || inst[i].op == '+' || syms[z+o].op == '+' || syms[z+o].op == '-') && syms[z+o].var != '$'){
+				operation[z][k++] = '0'; //don't put a +-0 in the start of the operation line
+			
+			}
+			else if (syms[z+o].var == '$') { //if the last operation is an assignment put the var into the result var
+				operation[z][k++] = syms[z-1+o].var;
+			}
+		}
+		
+		
+		++j; //if we don't do this inst[j].op will be == '&' for ever
+		
+		while (k != 0) { // until we reach the end of the operation line
+			switch(inst[i].op) {
+				case '<':
+					operation[z][k++] = '<';
+					operation[z][k++] = '<';
+					break;
+				case '>':
+					operation[z][k++] = '>';
+					operation[z][k++] = '>';
+					break;
+				case '&': //assignment operaton
+					break;
+				case '%': //operation with var operator
+					break;
+				default:
+					operation[z][k++] = inst[i].op; //everything else +, -, etc
+					break;
+			}
+		
+			if (inst[i].op != '&' && inst[i].op != '%') { //if normal operation
+				sprintf(tmp, "%d", inst[i].val); //convert int to string
+				strcpy(&operation[z][k++], tmp);
+				
+				k += strlen(tmp) - 1;
+				operation[z][k++] = ')';
+			}
+			else if (inst[i].op == '%') { //if operation with variable
+				operation[z][k++] = syms[z+o].op;
+				operation[z][k++] = syms[z+o].var; 
+				operation[z][k++] = ')';
+				
+				//when we have operation with a var 
+				++o;//and we don't do an assingment, we skip the next var in the table
+			}
+			else {
+				operation[z][k] = '\0'; //if we reach the end
+				k = 0;
+			}
+			++i; //instruction counter
+		}
+	}
+	
+
+	/*generate the full code*/
+	strcpy(code, "#include <stdio.h>\n#include <stdlib.h>\nint main(void) {\n\tint ");
+	i = strlen(code); //now the i is the code character counter
+	
+	/*define the variable at the start of the code*/
+	def = 0;
+	//code[i++] = syms[0].var;
+	for (j = 0; syms[j].var != '!'; ++j) { //scan symbols table until reach the end, j is the symbols counter
+		for (k = 0; k < j; ++k) { //check if var already defined, k is the unique variable counter
+			if (syms[k].var == syms[j].var) {
+				def = 1;
+				break;
+			}
+		}
+		if (def) { //if so
+			def = 0;
+			continue;
+		}
+		
+		if (j > 0) {
+			code[i++] = ',';
+			code[i++] = ' ';
+		}
+		if (syms[j].var != '$') {
+			code[i++] = syms[j].var;
+		}
+		else {
+			strcpy(&code[i], "result");
+			i = strlen(code);
+		}
+	}
+	code[i++] = ';';
+	
+	/*merge in the code the operation lines*/
+	for (j = 0, k = 0; k < z; ++j) { //j here is the assignments counter,
+		if (syms[j].op != '&') { //z is the total operation lines and k operation counter
+			continue;
+		}
+		
+		code[i++] = '\n';
+		code[i++] = '\t';
+		if (syms[j].var != '$') {
+			code[i++] = syms[j].var;
+		}
+		else { //if we reach the default assignment variable
+			strcpy(&code[i], "result"); //make the final assignemt to the default var
+			i = strlen(code);
+		}
+		
+		code[i++] = ' ';
+		code[i++] = '=';
+		code[i++] = ' ';
+		
+		strcpy(&code[i], operation[k++]);
+		i = strlen(code);
+		
+		code[i++] = ';';
+	}
+	strcpy(&code[i], "\n\tprintf(\"Result = %d\\n\", result);\n\treturn 0;\n}\n");
+}
+
+void save_code(char *code, char *fout) {
+	FILE *fp;
+
+	if (!(fp = fopen(fout, "w"))) {
+		printf("%s\n", strerror(errno));
+		exit(-1);
+	}
+	
+	fputs(code, fp); //write the code to the file
+	printf("File %s has been created.\n", fout);
+	fclose(fp);
+}
+
 inline int is_power_of_2(int x) {
 	if (x == 1 || x == 2 || x == 4 || x == 8 || x == 16 || x == 32 || x == 64 || x == 128 || x == 256 || x == 512 || x == 1024) {
 		return 1;
@@ -333,158 +500,6 @@ int shift_times(int x) {
 		return -1; //else return -1 to indicate wrong input
 	}
 }
-
-void generate_code(instruction *inst, char *code, int int_num, symbol *syms) {
-	int i, k, z, j, o = 0; //counters
-	int def = 0;
-	
-	//its operation is line of c code with a var as the lvalue and mathematical proposition as the rvaule 
-	char operation[100][1000]; //max 100 operations, 1000 char each
-	char tmp[1000];
-	
-	for (i = 0, z = 0, j = 0; i < int_num; ++z) {
-		
-		for (k = 0; j < int_num && inst[j].op != '&'; ++j, ++k) {//put int_num start brackets on the left of the operation
-			operation[z][k] = '(';
-		}
-		
-		if (syms[z+o].var == '$') { //if only result var is left, put all data in it
-			operation[z][k++] = syms[z-1+o].var;
-		}
-		else if (!(inst[i].op == '-' || inst[i].op == '+' || syms[z+o].op == '+' || syms[z+o].op == '-')){
-			operation[z][k++] = '0';
-		}
-		
-		++j;
-		
-		while (k != 0) {
-			switch(inst[i].op) {
-				case '<':
-					operation[z][k++] = '<';
-					operation[z][k++] = '<';
-					break;
-				case '>':
-					operation[z][k++] = '>';
-					operation[z][k++] = '>';
-					break;
-				case '&':
-					break;
-				case '%':
-					break;
-				default:
-					operation[z][k++] = inst[i].op;
-					break;
-			}
-		
-			if (inst[i].op != '&' && inst[i].op != '%') {
-				sprintf(tmp, "%d", inst[i].val); //convert int to string
-				strcpy(&operation[z][k++], tmp);
-				k += strlen(tmp) - 1;
-				
-				operation[z][k++] = ')';
-			}
-			else if (inst[i].op == '%') {
-				switch (inst[i].val) {
-					case 1:
-						operation[z][k++] = '+';
-						break;
-					case 2:
-						operation[z][k++] = '-';
-						break;
-					case 3:
-						operation[z][k++] = '*';
-						break;
-					case 4:
-						operation[z][k++] = '/';
-						break;
-				}
-				operation[z][k++] = syms[z+o].var; //when we have operation with a var 
-				operation[z][k++] = ')';
-				
-				++o;//and not assingment, we skip the next var in the table
-			}
-			else {
-				operation[z][k] = '\0';
-				k = 0;
-			}
-			++i; //instruction counter
-		}
-	}
-	
-
-	//generate the code
-	strcpy(code, "#include <stdio.h>\n#include <stdlib.h>\nint main(void) {\n\tint ");
-	i = strlen(code);
-	
-	def = 0;
-	code[i++] = syms[0].var;
-	for (j = 1; syms[j].var != '!'; ++j) { //scan symbols table until reach the end
-	
-		for (k = 0; k < j; ++k) { //check if var already defined
-			if (syms[k].var == syms[j].var) {
-				def = 1;
-				break;
-			}
-		}
-		if (def) { //if so
-			def = 0;
-			continue;
-		}
-	
-		code[i++] = ',';
-		code[i++] = ' ';
-		if (syms[j].var != '$') {
-			code[i++] = syms[j].var;
-		}
-		else {
-			strcpy(&code[i], "result");
-			i = strlen(code);
-		}
-	}
-	code[i++] = ';';
-	
-	for (j=0,k=0; k < z; ++j) {
-		if (syms[j].op != '&') {
-			continue;
-		}
-	
-		code[i++] = '\n';
-		code[i++] = '\t';
-		if (syms[j].var != '$') {
-			code[i++] = syms[j].var;
-		}
-		else {
-			strcpy(&code[i], "result");
-			i = strlen(code);
-		}
-		
-		code[i++] = ' ';
-		code[i++] = '=';
-		code[i++] = ' ';
-		
-		strcpy(&code[i], operation[k++]);
-		i = strlen(code);
-		
-		code[i++] = ';';
-	}
-	strcpy(&code[i], "\n\tprintf(\"Result = %d\\n\", result);\n}\n");
-}
-
-
-void save_code(char *code, char *fout) {
-	FILE *fp;
-
-	if (!(fp = fopen(fout, "w"))) {
-		printf("%s\n", strerror(errno));
-		exit(-1);
-	}
-	
-	fputs(code, fp); //write the code to the file
-	printf("File %s has been created.\n", fout);
-	fclose(fp);
-}
-
-
 
 
 
