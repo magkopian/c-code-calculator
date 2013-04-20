@@ -8,6 +8,7 @@
 
 char error_buffer[2000];
 int error_cnt = 0;
+int removed_lines = 1; //set it to 1 and not 0 because for user first line is 1
 
 /*******************************************************
 * Valid tokens operations:                             *
@@ -49,6 +50,9 @@ token scan_one_token(char *line);
 /*Print the tokens from a token array (for debugging usage)*/
 void print_tokens (token *tokens, int t);
 
+/*Analize the code to detect syndax errors, unreachable code etc*/
+int analize_tokens(token *tokens, int t);
+
 int main (int argc, char *argv[]) {
 	char buffer[10000];
 	token tokens[500];
@@ -74,12 +78,19 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
+	/*parse the code*/
 	validate_tokens(buffer);
 	t = extract_tokens(buffer, tokens);
 	
-/*	Print tokens for debugging*/
-/*	print_tokens(tokens, t);*/
+	/*syntax analysis*/
+	t = analize_tokens(tokens, t);
 	
+/*	Print tokens and errors for debugging*/
+	print_tokens(tokens, t);
+	
+	if (error_cnt != 0) {
+		puts(error_buffer);
+	}
 	
 	return 0;
 }
@@ -163,12 +174,14 @@ int validate_tokens (char *buffer) {
 			else {
 				noerror = 0;
 				//log the error to the global error buffer
-				sprintf(&error_buffer[error_cnt], "%d: unrecognised token\n", ln);
+				sprintf(&error_buffer[error_cnt], "%d: unrecognised token\n", ln + removed_lines);
 				error_cnt += strlen(&error_buffer[error_cnt]);
 			}
 			++ln;
 		}
 	}
+	
+	removed_lines += ln - l;
 	
 	strcpy(buffer, tmp);
 	return noerror;
@@ -193,6 +206,7 @@ int extract_tokens(char *buffer, token *tokens) {
 			tokens[t++] = scan_one_token(line);
 			if (tokens[t-1].type == invalid) { //this should never happen
 				--t;
+				++removed_lines;
 			}
 		}
 		
@@ -262,7 +276,7 @@ token scan_one_token(char *line) {
 	return tkn;
 }
 
-
+/*Print the tokens from a token array (for debugging usage)*/
 void print_tokens (token *tokens, int t) {
 	int i;
 	
@@ -278,6 +292,77 @@ void print_tokens (token *tokens, int t) {
 		}
 	}
 }
+
+/*Analize the code to detect syndax errors, unreachable code etc*/
+int analize_tokens(token *tokens, int t) {
+	int i;
+	int e = 0; //eop counter
+	
+	/*Detect unreachable code of if eop is missing*/
+	for (i = 0; i < t; ++i) {
+		if (tokens[i].type == eop) {
+			++e;
+			if (e == 1) {
+				break;
+			}
+		}
+	}
+	
+	if (e == 0) { //eop is missing
+		//log the error to the global error buffer
+		sprintf(&error_buffer[error_cnt], "%d: end_of_program token is missing. Autoassign it at line %d\n", i + removed_lines, i + removed_lines);
+		error_cnt += strlen(&error_buffer[error_cnt]);
+		
+		/*Assign eop token at the end of the program*/
+		tokens[i].type = eop;
+		tokens[i].operation = t_end;
+		
+		t = i + 1; //update tokens counter
+	}
+	else if (t > i + 1) { //then we have unreachable code at position i + 1
+		//log the error to the global error buffer
+		sprintf(&error_buffer[error_cnt], "%d: unreachable code detected\n", i + removed_lines + 1);
+		error_cnt += strlen(&error_buffer[error_cnt]);
+		
+		t = i + 1; //drop the unreachable code
+	}
+
+
+	/*Add result variable assignment at the end of the program*/
+	tokens[++t-1].type = eop;
+	tokens[t-1].operation = t_end;
+	
+	tokens[t-2].type = variable;
+	tokens[t-2].operation = t_assign;
+	tokens[t-2].data.name = '$'; //result variable is symbolized with the dollar sign
+	
+	return t;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
