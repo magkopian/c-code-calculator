@@ -1,125 +1,117 @@
+#include <regex.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdlib.h>  
 #include <string.h>
 #include <errno.h>
 
-/*error report table*/
-char error_log[10000] = "No Errors.\n";
-int e_i = 0; //error counter
+#define VALINE "^[ ]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\)\\([ ]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ ]\\+[a-z]\\)\\|\\([=]\\)\\)[ ]*$"
 
-/*the struct for the instruction token*/
-struct instruction {
-	char op; //operator
-	int val; //value
-};
+char error_buffer[2000];
+int error_cnt = 0;
 
-/*the struct for the variable token*/
-struct symbol {
-	char op; //operator
-	char var; //variable name;
-};
+/*******************************************************
+* Valid tokens operations:                             *
+*                                                      *
+* Type variable: t_plus, t_min, t_mul, t_div, t_assign *
+* Type literal: t_plus, t_min, t_mul, t_div            *
+* Type eop: t_end                                      *
+********************************************************/
 
+/*Valid token type and token operation declaration*/
+typedef enum {variable = 100, literal, eop, invalid} token_type;
+typedef enum {t_plus = 200, t_min, t_mul, t_div, t_assign, t_end} token_operation;
 
-typedef struct instruction instruction;
-typedef struct symbol symbol;
+/*Token struct declaration*/
+typedef struct {
+	token_type type; //variable | literal | eop
+	token_operation operation; //t_plus | t_min | t_mul | t_div | t_assign | t_end
+	union {
+		int value; //for literals only
+		char name; //for variables only
+	} data; //eop carries no data
+} token;
 
-/*put's instructions in a buffer, separated with semicolons*/
-void get_instructions(char *buffer, FILE *fp);
+/*Checks if a line of code is valid using a regex*/
+int is_valid_line (char *line);
 
-/*extracts instructions from buffer*/
-int extract_instructions(char *buffer, instruction *inst, symbol *syms);
+/*Gets the instuctions from the input file and serialezes them*/
+int serialize_input (char *buffer, FILE *fp);
 
-/*return length of instruction*/
-inline int llen(char *str);
+/*Validate the tokens in each line and make sure only valid tokens exist*/
+int validate_tokens (char *buffer);
 
-/*parse line and extract instruction tokens*/
-instruction parse_line(char *line, int line_len, int k, symbol *syms);
+/*Extracts the tokens from a buffer with valid serialized instructions, using function scan_one_token*/
+int extract_tokens(char *buffer, token *tokens);
 
-/*execute an instruction*/
-int do_operation(char op, int val);
+/*Takes a line of valid code and extracts the token from it*/
+token scan_one_token(char *line);
 
-/*optimize the instructions and return number of instructions after optimization*/
-int optimize(instruction *inst, int int_num, symbol *syms);
+/*Print the tokens from a token array (for debugging usage)*/
+void print_tokens (token *tokens, int t);
 
-/*check if an integer is power of 2*/
-inline int is_power_of_2(int x);
-
-/*return shift equiv for power of 2 div or mul*/
-int shift_times(int x);
-
-/*generate the c code based on the instruction tokens*/
-void generate_code(instruction *inst, char *code, int int_num, symbol *syms);
-
-/*generate c file with the code*/
-void save_code(char *code, char *fout);
-
-
-int main(int argc, char **argv) {
-	char buffer[10000]; //10000 characters max length of source code
-	int int_num;
-	int i;
-	int num;
-	instruction inst[1000]; //1000 instuctions max
-	symbol syms[100]; //100 variables max
-	char code[2000]; //2000 characters max length of C code
+int main (int argc, char *argv[]) {
+	char buffer[10000];
+	token tokens[500];
+	int t; //total number of tokens
+	int i; //general use counter
+	int res;
 	FILE *fp;
-
-
+	
 	if (argc < 2) { //check if the number of arguments is correct
-		puts("No input file has been specified.");
-		exit(-1);
+		printf("Usage: %s <input_file> -o <output_file>\n", argv[0]);
+		return 1;
 	}
 	else if ((fp = fopen(argv[1], "r")) == NULL) { //try to open the input file
 		printf("%s\n", strerror(errno));
-		exit(-2);
+		return 2;
 	}
 	else {
-		get_instructions(buffer, fp); //put instuctions from the input file to the buffer
+		res = serialize_input(buffer, fp); //put instuctions from the input file to the buffer serialized
 		close(fp);
+		if (res == 0) {
+			puts("Empty input file.");
+			return 3;
+		}
 	}
 
+	validate_tokens(buffer);
+	t = extract_tokens(buffer, tokens);
 	
-	int_num = extract_instructions(buffer, inst, syms); //extract instuctions from the buffer
+/*	Print tokens for debugging*/
+/*	print_tokens(tokens, t);*/
 	
-	if (int_num == -1) {
-		puts("No instructions found in the file.");
-		exit(-3);
-	}
-	else { //if everything is ok
-		puts(error_log); //print error log (or "No Errors" message if there isn't any)
-		
-		int_num = optimize(inst, int_num, syms); //do instruction opimization
-		generate_code(inst, code, int_num, syms); //generate c code
-		
-		
-		//check if output file has been specified
-		if (argc == 4 && strcmp(argv[2], "-o") == 0) {
-			save_code(code, argv[3]);
-		}
-		else {
-			save_code(code, "out.c");
-		}
-		
-		/*print tokens and symbols (for debugging)*/
-		////////////////////////////////////////////
-		for (i = 0; syms[i].var != '!'; ++i) {
-			printf("%c %c\n", syms[i].var, syms[i].op);
-		}
-		putchar('\n');
-		putchar('\n');
-		for (i = 0; i < int_num; ++i) {
-			printf("%c %d\n", inst[i].op, inst[i].val);
-		}
-		putchar('\n');
-		putchar('\n');
-		////////////////////////////////////////////
-		
-	}
+	
 	return 0;
 }
 
-void get_instructions(char *buffer, FILE *fp) {
-	int i = 0;
+/*Checks if a line of code is valid using a regex*/
+int is_valid_line (char *line) {
+	int regres; //the result of regex
+	regex_t regex; //the regular expretion
+	char *regerr; //regex error buffer
+	
+	regres = regcomp(&regex, VALINE, 0); //compile the regex
+	regres = regexec(&regex, line, 0, NULL, 0); //execute regex
+	
+	if (!regres){
+		regfree(&regex); //free the compiled regex
+		return 1; //line is accepted
+	}
+	else if (regres == REG_NOMATCH){
+		regfree(&regex); //free the compiled regex
+		return 0; //line is not accepted
+	}
+	else{
+		regfree(&regex); //free the compiled regex
+		regerror(regres, &regex, regerr, sizeof(regerr));
+		fputs(regerr, stderr);
+		exit(-1);
+	}
+}
+
+/*Gets the instuctions from the input file and validates them*/
+int serialize_input (char *buffer, FILE *fp) {
+	int i = 0; //lines counter
 	int line_len;
 	
 	for(i = 0; !feof(fp); i += line_len) {
@@ -132,374 +124,161 @@ void get_instructions(char *buffer, FILE *fp) {
 			continue;
 		}
 		
-		
-		//detect end char
-		if (line_len == 2 && buffer[i] == '=') {
-			buffer[i] = '\0';
-			break;
-		}
-		else {
-			//put ';' delimiter at the end of line
-			buffer[i + line_len - 1] = ';';
-		}
+		//put ';' delimiter at the end of line
+		buffer[i + line_len - 1] = ';';
 	}
-}
-
-int extract_instructions(char *buffer, instruction *inst, symbol *syms) {
-	int i, k;
-	int line_len = 0;
-	
-	if (strlen(buffer) == 0) return -1; //error NULL buffer
-
-	for (i = 0, k = 0; buffer[i] != '\0'; i += line_len + 1, ++k) {
-		line_len = llen(&buffer[i]);
-		
-		inst[k] = parse_line(&buffer[i], line_len, k, syms);
-	}
-	inst[k].op = '&';
-	inst[k++].val = -2;
-	
-	return k; //return num of instructions
-}
-
-inline int llen(char *str) {
-	int i;
-	for (i = 0; str[i] != ';'; ++i);
 	return i;
 }
 
-instruction parse_line(char *line, int line_len, int k, symbol *syms) {
-	instruction inst;
-	int i;
-	char num[100];
-	char *msg;
-	char str[20];
-	int isvar = 0;
-	int isopvar = 0;
-	static int varc = 0;
-	
-	inst.op = '+'; //int operator
-	
-	
-	syms[varc+1].var = '!'; //define the end of the symbols table
-	syms[varc+1].op = '!';
-	
-	syms[varc].var = '$'; //the result variable
-	syms[varc].op = '&';
-		
-		
-	if (line[0] == '=' && line[1] == ' ' && line[2] >= 'a' && line[2] <= 'z' && line[3] == ';') { //it's a var!
-		isvar = 1;
-	}
-	else if (line[0] != '+' && line[0] != '-' && line[0] != '*' && line[0] != '/') {
-		inst.op = '!'; //error in instruction
-		inst.val = 0;
-		
-		sprintf(str, "%d", k+1); //convert int to string
-		msg = strcpy(&error_log[e_i], str);
-		e_i += strlen(msg);
-		msg = strcpy(&error_log[e_i], ": No operator specified!\n\0"); //only the \0 of the last error will not been overwritten
-		e_i += strlen(msg);
-	}
-	else if (line[1] != ' ') {
-		inst.op = '!'; //error in instruction
-		inst.val = 0;
-				
-		sprintf(str, "%d", k+1); //convert int to string
-		msg = strcpy(&error_log[e_i], str);
-		e_i += strlen(msg);
-		msg = strcpy(&error_log[e_i], ": No delimiter after operator!\n\0"); //only the \0 of the last error will not been overwritten
-		e_i += strlen(msg);
-	}
-	else {
-		if (line[2] >= 'a' && line[2] <= 'z' && line[3] == ';') { //it's operation with var
-			isopvar = 1;
-		}
-		else { //it's operation with constant
-			for (i = 2; i < line_len; ++i) {
-				if (line[i] < '0' || line[i] > '9' ) {
-					inst.op = '!'; //error in instruction
-					inst.val = 0;
-						
-					sprintf(str, "%d", k+1); //convert int to string
-					msg = strcpy(&error_log[e_i], str);
-					e_i += strlen(msg);
-					msg = strcpy(&error_log[e_i], ": Not an integer value!\n\0"); //only the \0 of the last error will not been overwritten
-					e_i += strlen(msg);
-					break;
-				}
-			}
-		}
-	}
-	
-	//if operator = '!' then the line contains a syndax error
-	if (inst.op != '!' && !isvar && !isopvar) {
-		inst.op = line[0];
-		
-		for (i = 2; line[i] != ';'; ++i) {
-			num[i-2] = line[i];
-		}
-		num[i-2] = '\0';
-		
-		inst.val = atoi(num);
-	}
-	else if (inst.op != '!' && isvar && !isopvar) { //if isvar init the variable
-		inst.op = '&';
-		inst.val = varc; //this acts as a pointer to the var inside the source program flow
-		
-		syms[varc+2].var = '!'; //define the end of the symbols table
-		syms[varc+2].op = '!';
-		
-		syms[varc+1].var = '$'; //the result variable
-		syms[varc+1].op = '&';
-		
-		syms[varc].var = line[2]; //log the variable
-		syms[varc++].op = '&';
-	}
-	else if (inst.op != '!' && isopvar && !isvar) { //if isvar init the variable
-		inst.op = '%';
-		
-		switch (line[0]) {
-			case '+':
-				inst.val = 1;
-				break;
-			case '-':
-				inst.val = 2;
-				break;
-			case '*':
-				inst.val = 3;
-				break;
-			case '/':
-				inst.val = 4;
-				break;
-		}
-		
-		syms[varc+2].var = '!'; //define the end of the symbols table
-		syms[varc+2].op = '!';
-		
-		syms[varc+1].var = '$'; //the result variable
-		syms[varc+1].op = '&';
-		
-		syms[varc].op = line[0];
-		syms[varc++].var = line[2]; //log the variable
-	}
-	
-	return inst;
-}
+/*Validate the tokens in each line and make sure only valid tokens exist*/
+int validate_tokens (char *buffer) {
+	char tmp[10000];
+	char line[500]; //max 500 characters each line
+	int i; //buffer counter
+	int j; //line pos counter
+	int l = 0; //valid line counter
+	int k = 0; //tmp char offset
+	int ln = 0; //lines counter
+	int noerror = 1;
 
-int optimize(instruction *inst, int int_num, symbol *syms) {
-	int i, k, z;
-	instruction buff[int_num];
 
-	for (i = 0, z = -1; i < int_num; ++i) { //find the last result *= 0
-		if (inst[i].op == '*' && inst[i].val == 0) {
-			z = i;
+	for (i = 0, j = 0; buffer[i] != '\0'; ++i) {
+		if (j > 499) { //buffer overflow
+			fputs("Error! Buffer overflow.", stderr);
+			exit(-3);
 		}
-	}
-
-	for (i = z + 1, k = 0; i < int_num; ++i) { //start after the last *= 0
-		if (inst[i].op != '!' && !((inst[i].op == '+' || inst[i].op == '-') && inst[i].val == 0) &&
-				!((inst[i].op == '*' || inst[i].op == '/') && inst[i].val == 1) ) { //drop dead operations
-			buff[k].op = inst[i].op;
-			buff[k++].val = inst[i].val;
-		}
-	}
-
-	for (i = 0; i < int_num; ++i) { //optimize for powers of two
-		if (buff[i].op == '*' && is_power_of_2(buff[i].val)) {
-			buff[i].op = '<'; // '<' -> res <<= x
-			buff[i].val = shift_times(buff[i].val);
-		}
-		else if (buff[i].op == '/' && is_power_of_2(buff[i].val)) {
-			buff[i].op = '>'; // '>' -> res >>= x
-			buff[i].val = shift_times(buff[i].val);
-		}
-	}
-
-	for (i = 0; i < k; ++i) {
-		inst[i] = buff[i];
-	}
-	
-	return k;
-}
-
-void generate_code(instruction *inst, char *code, int int_num, symbol *syms) {
-	int i = 0; //instuction counter
-	int k = 0; //operation line char counter
-	int z = 0; //operation counter
-	int j = 0; //instuction counter excluding assignments
-	int o = 0; //operations with var counter
-	int def = 0; //var already defined flag
-	
-	//as an operation is defined one line of C code with a var as the lvalue and mathematical proposition as the rvaule 
-	char operation[100][1000]; //max 100 operations, 1000 char each
-	char tmp[1000]; //general use temp string
-	
-	/*generate the operation lines*/
-	for (i = 0, z = 0, j = 0; i < int_num; ++z) {
-		
-		for (k = 0; j < int_num && inst[j].op != '&'; ++j, ++k) {//put int_num start brackets on the left of the operation
-			operation[z][k] = '('; //stop when assing operator or end of instuctions found
-		}
-		
-		
-		if (syms[0].var == '$') {
-			if (!(inst[i].op == '-' || inst[i].op == '+' || syms[z+o].op == '+' || syms[z+o].op == '-')){
-				operation[z][k++] = '0'; //don't put a +-0 in the start of the operation line
-			
-			}
-			else if (syms[z+o].var == '$') { //if the last operation is an assignment put the var into the result var
-				operation[z][k++] = syms[z-1+o].var;
-			}
+		else if (buffer[i] != ';') {
+			line[j++] = buffer[i];
 		}
 		else {
-			if (!(inst[i].op == '-' || inst[i].op == '+' || syms[z+o].op == '+' || syms[z+o].op == '-') && syms[z+o].var != '$'){
-				operation[z][k++] = '0'; //don't put a +-0 in the start of the operation line
+			line[j] = '\0';
+			j = 0;
 			
-			}
-			else if (syms[z+o].var == '$') { //if the last operation is an assignment put the var into the result var
-				operation[z][k++] = syms[z-1+o].var;
-			}
-		}
-		
-		
-		++j; //if we don't do this inst[j].op will be == '&' for ever
-		
-		while (k != 0) { // until we reach the end of the operation line
-			switch(inst[i].op) {
-				case '<':
-					operation[z][k++] = '<';
-					operation[z][k++] = '<';
-					break;
-				case '>':
-					operation[z][k++] = '>';
-					operation[z][k++] = '>';
-					break;
-				case '&': //assignment operaton
-					break;
-				case '%': //operation with var operator
-					break;
-				default:
-					operation[z][k++] = inst[i].op; //everything else +, -, etc
-					break;
-			}
-		
-			if (inst[i].op != '&' && inst[i].op != '%') { //if normal operation
-				sprintf(tmp, "%d", inst[i].val); //convert int to string
-				strcpy(&operation[z][k++], tmp);
-				
-				k += strlen(tmp) - 1;
-				operation[z][k++] = ')';
-			}
-			else if (inst[i].op == '%') { //if operation with variable
-				operation[z][k++] = syms[z+o].op;
-				operation[z][k++] = syms[z+o].var; 
-				operation[z][k++] = ')';
-				
-				//when we have operation with a var 
-				++o;//and we don't do an assingment, we skip the next var in the table
+			if (is_valid_line(line)) {
+				++l;
+				strcpy(&tmp[k], line);
+				k += strlen(&tmp[k]);
+				tmp[k++] = ';';
 			}
 			else {
-				operation[z][k] = '\0'; //if we reach the end
-				k = 0;
+				noerror = 0;
+				//log the error to the global error buffer
+				sprintf(&error_buffer[error_cnt], "%d: unrecognised token\n", ln);
+				error_cnt += strlen(&error_buffer[error_cnt]);
 			}
-			++i; //instruction counter
+			++ln;
 		}
 	}
 	
+	strcpy(buffer, tmp);
+	return noerror;
+}
 
-	/*generate the full code*/
-	strcpy(code, "#include <stdio.h>\n#include <stdlib.h>\nint main(void) {\n\tint ");
-	i = strlen(code); //now the i is the code character counter
-	
-	/*define the variable at the start of the code*/
-	def = 0;
-	//code[i++] = syms[0].var;
-	for (j = 0; syms[j].var != '!'; ++j) { //scan symbols table until reach the end, j is the symbols counter
-		for (k = 0; k < j; ++k) { //check if var already defined, k is the unique variable counter
-			if (syms[k].var == syms[j].var) {
-				def = 1;
-				break;
-			}
-		}
-		if (def) { //if so
-			def = 0;
-			continue;
-		}
-		
-		if (j > 0) {
-			code[i++] = ',';
-			code[i++] = ' ';
-		}
-		if (syms[j].var != '$') {
-			code[i++] = syms[j].var;
+/*Extracts the tokens from a buffer with valid serialized instructions, using function scan_one_token*/
+int extract_tokens(char *buffer, token *tokens) {
+	char line[500]; //max 500 characters each line
+	int i; //buffer counter
+	int j; //line characters counter
+	int t = 0; //total scaned tokens
+
+	for (i = 0, j = 0; buffer[i] != '\0'; ++i) {
+
+		if (buffer[i] != ';') {
+			line[j++] = buffer[i];
 		}
 		else {
-			strcpy(&code[i], "result");
-			i = strlen(code);
+			line[j] = '\0';
+			j = 0;
+			
+			tokens[t++] = scan_one_token(line);
+			if (tokens[t-1].type == invalid) { //this should never happen
+				--t;
+			}
 		}
+		
 	}
-	code[i++] = ';';
-	
-	/*merge in the code the operation lines*/
-	for (j = 0, k = 0; k < z; ++j) { //j here is the assignments counter,
-		if (syms[j].op != '&') { //z is the total operation lines and k operation counter
-			continue;
-		}
-		
-		code[i++] = '\n';
-		code[i++] = '\t';
-		if (syms[j].var != '$') {
-			code[i++] = syms[j].var;
-		}
-		else { //if we reach the default assignment variable
-			strcpy(&code[i], "result"); //make the final assignemt to the default var
-			i = strlen(code);
-		}
-		
-		code[i++] = ' ';
-		code[i++] = '=';
-		code[i++] = ' ';
-		
-		strcpy(&code[i], operation[k++]);
-		i = strlen(code);
-		
-		code[i++] = ';';
-	}
-	strcpy(&code[i], "\n\tprintf(\"Result = %d\\n\", result);\n\treturn 0;\n}\n");
+	return t;
 }
 
-void save_code(char *code, char *fout) {
-	FILE *fp;
+/*Takes a line of valid code and extracts the token from it*/
+token scan_one_token(char *line) {
+	token tkn;
+	char num[100];
+	char op;
+	int i;
+	int s;
+	
+	if (!is_valid_line(line)) { //if validate_tokens function works as expected this should never happen, just in case
+		tkn.type = invalid;
+		return tkn;
+	}
 
-	if (!(fp = fopen(fout, "w"))) {
-		printf("%s\n", strerror(errno));
-		exit(-1);
+	for (s = 0; line[s] == ' '; ++s); //drop spaces on the start of line
+	op = line[s]; //get the operator character
+	
+	switch (op) {
+		case '+':
+			tkn.operation = t_plus;
+			break;
+		case '-':
+			tkn.operation = t_min;
+			break;
+		case '*':
+			tkn.operation = t_mul;
+			break;
+		case '/':
+			tkn.operation = t_div;
+			break;
+		case '=':
+			tkn.operation = t_assign; //or t_end we will find out later
+			break;
 	}
 	
-	fputs(code, fp); //write the code to the file
-	printf("File %s has been created.\n", fout);
-	fclose(fp);
-}
-
-inline int is_power_of_2(int x) {
-	if (x == 1 || x == 2 || x == 4 || x == 8 || x == 16 || x == 32 || x == 64 || x == 128 || x == 256 || x == 512 || x == 1024) {
-		return 1;
-	}
-	return 0;
-}
-
-int shift_times(int x) {
-	int i, k;
-	for (i = 1, k = 0; i < x; i *= 2, ++k);
+	for (++s; line[s] == ' '; ++s); //drop spaces on the start of line
 	
-	if (i == x) { //if x was a valid power of 2, after the end of the for loop
-		return k; //the i must be equal with x, in that case return k
+	if (line[s] == '\0') { //then we have a t_end, so...
+		tkn.operation = t_end;
+		tkn.type = eop;
+		//eop has no data
+	}
+	else if (line[s] >= 'a' && line[s] <= 'z') { //then we have a type of variable
+		//operation has been set in the switch
+		tkn.type = variable;
+		tkn.data.name = line[s];	
+	}
+	else if (line[s] >= '0' && line[s] <= '9') {
+		for (i = 0; line[s] >= '0' && line[s] <= '9'; num[i] = line[s], ++i, ++s); //parse the number
+		num[i] = '\0';
+		
+		//operation has been set in the switch
+		tkn.type = literal;
+		tkn.data.value = atoi(num);
 	}
 	else {
-		return -1; //else return -1 to indicate wrong input
+		//this should also never happen, just in case
+		tkn.type = invalid;
+	}
+	
+	return tkn;
+}
+
+
+void print_tokens (token *tokens, int t) {
+	int i;
+	
+	for (i = 0; i < t; ++i) {
+		if (tokens[i].type == literal) {
+			printf("type=%d operation=%d data=%d\n", tokens[i].type, tokens[i].operation, tokens[i].data.value);
+		}
+		else if (tokens[i].type == variable) {
+			printf("type=%d operation=%d data=%c\n", tokens[i].type, tokens[i].operation, tokens[i].data.name);
+		}
+		else {
+			printf("type=%d operation=%d\n", tokens[i].type, tokens[i].operation);
+		}
 	}
 }
+
 
 
 
