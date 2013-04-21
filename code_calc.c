@@ -4,6 +4,8 @@
 #include <string.h>
 #include <errno.h>
 
+#define DEBUG_MODE 1
+
 #define VALINE "^[ ]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\)\\([ ]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ ]\\+[a-z]\\)\\|\\([=]\\)\\)[ ]*$"
 #define BRACKET 1
 #define NO_BRACKET 0
@@ -68,7 +70,10 @@ int shift_times (int x);
 int generate_code (char *buffer, token *tokens, int t);
 
 /*Convert a token to code*/
-void token_to_code(token tkn, char *code_token, int put_bracket);
+void token_to_code (token tkn, char *code_token, int put_bracket);
+
+/*Generates the assignments lines of the C code*/
+int generate_assignments (token *tokens, int t, char *assign_buff);
 
 int main (int argc, char *argv[]) {
 	char buffer[10000];
@@ -87,7 +92,14 @@ int main (int argc, char *argv[]) {
 		return 2;
 	}
 	else {
-		res = serialize_input(buffer, fp); //put instuctions from the input file to the buffer serialized
+		/*Phase 0: Put instuctions from the input file to the buffer serialized*/
+		res = serialize_input(buffer, fp);
+		
+		/*If is on DEBUG_MODE print debuggin info*/
+		if (DEBUG_MODE) {
+			printf("Phase 0: Put instuctions from the input file to the buffer serialized:\n%s\n\n", buffer);
+		}
+		
 		close(fp);
 		if (res == 0) {
 			puts("Empty input file.");
@@ -95,22 +107,53 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
-	/*parse the code*/
+	/*Phase 1: Parse the code*/
 	validate_tokens(buffer);
+	
+	/*If is on DEBUG_MODE print debuggin info*/
+	if (DEBUG_MODE) {
+		printf("Phase 1: Remove lines with invalid tokens:\n%s\n\n", buffer);
+	}
+		
+	/*Phase 2: Extract the tokens*/
 	t = extract_tokens(buffer, tokens);
 	
-	/*syntax analysis*/
+	/*If is on DEBUG_MODE print debuggin info*/
+	if (DEBUG_MODE) {
+		puts("Phase 2: Extract the tokens:");
+		print_tokens(tokens, t);
+		putchar('\n');
+	}
+	
+	/*Phase 3: Do syntax analysis on the tokens*/
 	t = analize_tokens(tokens, t);
 	
-	/*optimization*/
+	/*If is on DEBUG_MODE print debuggin info*/
+	if (DEBUG_MODE) {
+		puts("Phase 3: Do syntax analysis on the tokens:");
+		print_tokens(tokens, t);
+		putchar('\n');
+	}
+	
+	/*Phase 4: Do optimization on the tokens*/
 	t = optimize_tokens(tokens, t);
 	
-	/*code generation*/
+	/*If is on DEBUG_MODE print debuggin info*/
+	if (DEBUG_MODE) {
+		puts("Phase 4: Do optimization on the tokens:");
+		print_tokens(tokens, t);
+		putchar('\n');
+	}
+	
+	/*Phase 5: Do code generation based on the tokens*/
 	generate_code(buffer, tokens, t);
 	
-/*	Print tokens and errors for debugging*/
-	print_tokens(tokens, t);
+	/*If is on DEBUG_MODE print debuggin info*/
+	if (DEBUG_MODE) {
+		printf("Phase 5: Do code generation based on the tokens:\n%s\n\n", buffer);
+	}
 	
+	/*Print errors buffer*/
 	if (error_cnt != 0) {
 		puts(error_buffer);
 	}
@@ -146,6 +189,7 @@ int is_valid_line (char *line) {
 /*Gets the instuctions from the input file and validates them*/
 int serialize_input (char *buffer, FILE *fp) {
 	int i = 0; //lines counter
+	int j;
 	int line_len;
 	
 	for(i = 0; !feof(fp); i += line_len) {
@@ -155,7 +199,15 @@ int serialize_input (char *buffer, FILE *fp) {
 		//discard null lines
 		if (line_len == 1) {
 			line_len = 0;
+			++removed_lines;
 			continue;
+		}
+		
+		/*Replace semicolons in the source code with an ivalid character so we won't have problems later */
+		for (j = 0; j < line_len; ++j) {
+			if (buffer[i + j] == ';') {
+				buffer[i + j] = '#';
+			}
 		}
 		
 		//put ';' delimiter at the end of line
@@ -430,8 +482,8 @@ int shift_times (int x) {
 	}
 }
 
-/*Generates C code based on a tokens array*/
-int generate_code (char *buffer, token *tokens, int t) {
+/*Generates the assignments lines of the C code*/
+int generate_assignments (token *tokens, int t, char *assign_buff) {
 	int i, j;
 	int last_assign = 0;
 	int last_assign_with_data = -1;
@@ -439,16 +491,25 @@ int generate_code (char *buffer, token *tokens, int t) {
 	int k = 0; //assignment counter 
 	char assignments[500][256];
 	char code_token[50];
+	char var_array[300];
+	int v = 0;
+	char vars_with_data[300];
+	char *vp; //var pointer 
 	
 	/*Generate the assignments to the variables*/
 	for (i = 0; i < t; ++i) {
 		if (tokens[i].operation == t_assign) { //then assign it, all the above tokens
+			var_array[a] = tokens[i].data.name; //log the assignment
 			
 			/*Begin the assignment line with the variable*/
 			if (tokens[i].data.name != '$') { //if we have an ordinary variable
+				assignments[a][k++] = '\n';
+				assignments[a][k++] = '\t';
 				assignments[a][k++] = tokens[i].data.name;
 			}
 			else {
+				assignments[a][k++] = '\n';
+				assignments[a][k++] = '\t';
 				strcpy(&assignments[a][k], "result"); //if we reached the default variable
 				k += strlen(&assignments[a][k]);
 			}
@@ -462,7 +523,7 @@ int generate_code (char *buffer, token *tokens, int t) {
 			for (j = last_assign; j + 1 < i; ++j, assignments[a][k++] = '(');
 			
 			/*If we have don't have +- at the start of the assignment put a zero*/
-			if (j != last_assign && tokens[last_assign].operation != t_plus && tokens[last_assign].operation != t_min) {
+			if (tokens[last_assign].operation != t_plus && tokens[last_assign].operation != t_min) {
 				assignments[a][k++] = '0';
 			}
 			
@@ -481,10 +542,18 @@ int generate_code (char *buffer, token *tokens, int t) {
 
 			/*If the assignment has no operation in it*/
 			if (last_assign >= i) { //this happens when we have 2 '= variable' in a row inside the code
-				assignments[a][k++] = '0';
+				//assignments[a][k++] = '0';
+				
+				//if this var has previously logged that has data 
+				if ((vp = strchr(vars_with_data, var_array[a])) != NULL) { //then unlog var
+					*vp = '!';
+				}
 			}
 			else {
 				last_assign_with_data = a; //detect the last assignment with data
+				if (strchr(vars_with_data, var_array[a]) == NULL) { //then unlog var
+					vars_with_data[v++] = var_array[a]; //this var has data
+				}
 			}
 			
 			/*Put the semicolon at the end of the assignment*/
@@ -498,13 +567,29 @@ int generate_code (char *buffer, token *tokens, int t) {
 	/*If we have assignments without data, put the last assignment with data in the result variable*/
 	if (last_assign_with_data != -1 && last_assign_with_data != a - 1) {
 		k = strlen(assignments[a-1]);
-		assignments[a-1][k-2] = assignments[last_assign_with_data][0];
+		
+		
+		for (i = v - 1; i >= 0; --i) {
+			if (vars_with_data[i] != '!') {
+				break;
+			}
+		}
+		
+		if (i == -1) { //then there is no variable with data
+			assignments[a-1][k-2] = '0';
+		}
+		else {
+			assignments[a-1][k-2] = vars_with_data[i];
+		}
 	}
 	
-	for (i = 0; i < a; ++i) {
-		puts(assignments[i]);
+	for (i = 0, k = 0; i < a; ++i) {
+		strcpy(&assign_buff[k], assignments[i]);
+		k += strlen(&assign_buff[k]);
 	}
-
+	assign_buff[k] = '\0';
+	
+	return 1;
 }
 
 /*Convert a token to code*/
@@ -549,7 +634,47 @@ void token_to_code(token tkn, char *code_token, int put_bracket) {
 	code_token[i++] = '\0';
 }
 
-
+/*Generates C code based on a tokens array*/
+int generate_code (char *buffer, token *tokens, int t) {
+	char assignments[10000];
+	int k = 0; //buffer counter
+	char used_var[300];
+	int i;
+	int j = 0;
+	
+	/*Generate the assignmets lines of code*/
+	generate_assignments(tokens, t, assignments);
+	
+	/*Put the first lines of code into the buffer*/
+	strcpy(&buffer[k], "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n\tint ");
+	k += strlen(&buffer[k]);
+	
+	/*Generate the variable definition*/
+	for (i = 0; i < t; ++i) {
+		if (tokens[i].operation == t_assign && strchr(used_var, tokens[i].data.name) == NULL) {
+			used_var[j++] = tokens[i].data.name; //log variable as used
+			
+			if (tokens[i].data.name != '$') {
+				buffer[k++] = tokens[i].data.name;
+				buffer[k++] = ',';
+				buffer[k++] = ' ';
+			}
+			else {
+				strcpy(&buffer[k], "result;\n");
+				k += strlen(&buffer[k]);
+			}
+		}
+	}
+	
+	/*Put the assignments lines of code into the buffer*/
+	strcpy(&buffer[k], assignments);
+	k += strlen(&buffer[k]);
+	
+	strcpy(&buffer[k], "\n\tprintf(\"Result = %d\\n\", result);\n\treturn 0;\n}\n");
+	k += strlen(&buffer[k]);
+	
+	return 1;
+}
 
 
 
