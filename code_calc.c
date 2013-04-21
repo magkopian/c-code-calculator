@@ -6,7 +6,7 @@
 
 #define DEBUG_MODE 0
 
-#define VALINE "^[ ]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\)\\([ ]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ ]\\+[a-z]\\)\\|\\([=]\\)\\)[ ]*$"
+#define VALINE "^[ 	]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\)\\([ 	]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ 	]\\+[a-z]\\)\\|\\([=]\\)\\)[ 	]*$"
 #define BRACKET 1
 #define NO_BRACKET 0
 
@@ -217,10 +217,17 @@ int serialize_input (char *buffer, FILE *fp) {
 			continue;
 		}
 		
-		/*Replace semicolons in the source code with an ivalid character so we won't have problems later */
+		/*Replace semicolons in the source code with an invalid character so we won't have problems later*/
 		for (j = 0; j < line_len; ++j) {
 			if (buffer[i + j] == ';') {
 				buffer[i + j] = '#';
+			}
+		}
+		
+		/*Replace all tabs with spaces*/
+		for (j = 0; j < line_len; ++j) {
+			if (buffer[i + j] == '\t') {
+				buffer[i + j] = ' ';
 			}
 		}
 		
