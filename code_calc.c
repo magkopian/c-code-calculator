@@ -42,25 +42,31 @@ int serialize_input (char *buffer, FILE *fp);
 int validate_tokens (char *buffer);
 
 /*Extracts the tokens from a buffer with valid serialized instructions, using function scan_one_token*/
-int extract_tokens(char *buffer, token *tokens);
+int extract_tokens (char *buffer, token *tokens);
 
 /*Takes a line of valid code and extracts the token from it*/
-token scan_one_token(char *line);
+token scan_one_token (char *line);
 
 /*Print the tokens from a token array (for debugging usage)*/
 void print_tokens (token *tokens, int t);
 
 /*Analize the code to detect syndax errors, unreachable code etc*/
-int analize_tokens(token *tokens, int t);
+int analize_tokens (token *tokens, int t);
 
 /*Do some basic optimization actions on the tokens before code generation*/
-int optimize_tokens(token *tokens, int t);
+int optimize_tokens (token *tokens, int t);
 
 /*Checks if an integer is power for two from 0 to 10*/
 inline int is_power_of_2 (int x);
 
 /*Return shift equiv for power of two div or mul*/
 int shift_times (int x);
+
+/*Generates C code based on a tokens array*/
+int generate_code (char *buffer, token *tokens, int t);
+
+/*Convert a token to code*/
+void token_to_code(token tkn, char *code_token);
 
 int main (int argc, char *argv[]) {
 	char buffer[10000];
@@ -96,6 +102,9 @@ int main (int argc, char *argv[]) {
 	
 	/*optimization*/
 	t = optimize_tokens(tokens, t);
+	
+	/*code generation*/
+	generate_code(buffer, tokens, t);
 	
 /*	Print tokens and errors for debugging*/
 	print_tokens(tokens, t);
@@ -200,7 +209,7 @@ int validate_tokens (char *buffer) {
 }
 
 /*Extracts the tokens from a buffer with valid serialized instructions, using function scan_one_token*/
-int extract_tokens(char *buffer, token *tokens) {
+int extract_tokens (char *buffer, token *tokens) {
 	char line[500]; //max 500 characters each line
 	int i; //buffer counter
 	int j; //line characters counter
@@ -227,7 +236,7 @@ int extract_tokens(char *buffer, token *tokens) {
 }
 
 /*Takes a line of valid code and extracts the token from it*/
-token scan_one_token(char *line) {
+token scan_one_token (char *line) {
 	token tkn;
 	char num[100];
 	char op;
@@ -306,7 +315,7 @@ void print_tokens (token *tokens, int t) {
 }
 
 /*Analize the code to detect syndax errors, unreachable code etc*/
-int analize_tokens(token *tokens, int t) {
+int analize_tokens (token *tokens, int t) {
 	int i;
 	int e = 0; //eop counter
 	
@@ -352,7 +361,7 @@ int analize_tokens(token *tokens, int t) {
 }
 
 
-int optimize_tokens(token *tokens, int t) {
+int optimize_tokens (token *tokens, int t) {
 	int i, z, k;
 	token tokens_tmp[500];
 
@@ -419,10 +428,104 @@ int shift_times (int x) {
 	}
 }
 
+/*Generates C code based on a tokens array*/
+int generate_code (char *buffer, token *tokens, int t) {
+	int i, j;
+	int last_assign = 0;
+	int a = 0; //assignment counter
+	int k = 0; //assignment counter 
+	char assignments[500][256];
+	char code_token[50];
+	
+	/*Generate the assignments to the variables*/
+	for (i = 0; i < t; ++i) {
+		if (tokens[i].operation == t_assign) { //then assign it, all the above tokens
+			
+			if (tokens[i].data.name != '$') {
+				assignments[a][k++] = tokens[i].data.name;
+			}
+			else {
+				strcpy(&assignments[a][k], "result");
+				k += strlen(&assignments[a][k]);
+			}
+			
+			strcpy(&assignments[a][k], " = ");
+			k += strlen(&assignments[a][k]);
+			
+			for (j = last_assign; j < i; ++j) {
+				assignments[a][k++] = '(';
+			}
+			
+			if (j != last_assign && tokens[last_assign].operation != t_plus && tokens[last_assign].operation != t_min) {
+				assignments[a][k++] = '0';
+			}
+			
+			
+			for (j = last_assign; j < i; ++j) {
+				token_to_code(tokens[j], code_token);
+				strcpy(&assignments[a][k], code_token);
+				k += strlen(&assignments[a][k]);
+			}
+			
+			j = last_assign;
+			
+			if (j >= i) { //in case of two assignment in a row
+				strcpy(&assignments[a][k], "(0)");
+				k += strlen(&assignments[a][k]);
+			}
+			
+			assignments[a][k++] = ';';
+			
+			++a;
+			k = 0;
+			last_assign = i + 1;
+		}
+	}
+	
+	for (i = 0; i < a; ++i) {
+		puts(assignments[i]);
+	}
 
+}
 
-
-
+/*Convert a token to code*/
+void token_to_code(token tkn, char *code_token) {
+	int i = 0;
+	
+	switch (tkn.operation) {
+		case t_plus:
+			code_token[i++] = '+';
+			break;
+		case t_min:
+			code_token[i++] = '-';
+			break;
+		case t_mul:
+			code_token[i++] = '*';
+			break;
+		case t_div:
+			code_token[i++] = '/';
+			break;
+		case t_shl:
+			code_token[i++] = '<';
+			code_token[i++] = '<';
+			break;
+		case t_shr:
+			code_token[i++] = '>';
+			code_token[i++] = '>';
+			break;
+	}
+		
+	if (tkn.type == literal) {
+		sprintf(&code_token[i++], "%d", tkn.data.value);
+		i = strlen(code_token);
+	}
+	else {
+		code_token[i++] = tkn.data.name;
+	}
+	
+	code_token[i++] = ')';
+	code_token[i++] = '\0';
+}
 
 
 
