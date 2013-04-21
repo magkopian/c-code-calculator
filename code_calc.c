@@ -263,7 +263,7 @@ int validate_tokens (char *buffer) {
 			else {
 				noerror = 0;
 				//log the error to the global error buffer
-				sprintf(&error_buffer[error_cnt], "%d: unrecognised token\n", ln + removed_lines);
+				sprintf(&error_buffer[error_cnt], "%d: error: unrecognised token `%s`\n", ln + removed_lines, line);
 				error_cnt += strlen(&error_buffer[error_cnt]);
 			}
 			++ln;
@@ -432,6 +432,15 @@ int analize_tokens (token *tokens, int t) {
 	int i;
 	int e = 0; //eop counter
 	
+	/*Detect division by zero*/
+	for (i = 0; i < t; ++i) {
+		if (tokens[i].type == literal && tokens[i].operation == t_div && tokens[i].data.value == 0) {
+			//log the warning to the global error buffer
+			sprintf(&error_buffer[error_cnt], "%d: warning: division by zero\n", i + removed_lines);
+			error_cnt += strlen(&error_buffer[error_cnt]);
+		}
+	}
+	
 	/*Detect unreachable code of if eop is missing*/
 	for (i = 0; i < t; ++i) {
 		if (tokens[i].type == eop) {
@@ -444,7 +453,7 @@ int analize_tokens (token *tokens, int t) {
 	
 	if (e == 0) { //eop is missing
 		//log the error to the global error buffer
-		sprintf(&error_buffer[error_cnt], "%d: end_of_program token is missing. Autoassign it at line %d\n", i + removed_lines, i + removed_lines);
+		sprintf(&error_buffer[error_cnt], "%d: error: end_of_program token is missing. Autoassign at line %d\n", i + removed_lines, i + removed_lines);
 		error_cnt += strlen(&error_buffer[error_cnt]);
 		
 		/*Assign eop token at the end of the program*/
@@ -455,7 +464,7 @@ int analize_tokens (token *tokens, int t) {
 	}
 	else if (t > i + 1) { //then we have unreachable code at position i + 1
 		//log the error to the global error buffer
-		sprintf(&error_buffer[error_cnt], "%d: unreachable code detected\n", i + removed_lines + 1);
+		sprintf(&error_buffer[error_cnt], "%d: error: unreachable code detected\n", i + removed_lines + 1);
 		error_cnt += strlen(&error_buffer[error_cnt]);
 		
 		t = i + 1; //drop the unreachable code
