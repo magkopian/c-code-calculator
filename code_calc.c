@@ -20,7 +20,7 @@ int removed_lines = 1; //set it to 1 and not 0 because for user first line is 1
 
 /*Valid token type and token operation declaration*/
 typedef enum {variable = 100, literal, eop, invalid} token_type;
-typedef enum {t_plus = 200, t_min, t_mul, t_div, t_assign, t_end} token_operation;
+typedef enum {t_plus = 200, t_min, t_mul, t_div, t_shl, t_shr, t_assign, t_end} token_operation;
 
 /*Token struct declaration*/
 typedef struct {
@@ -53,6 +53,15 @@ void print_tokens (token *tokens, int t);
 /*Analize the code to detect syndax errors, unreachable code etc*/
 int analize_tokens(token *tokens, int t);
 
+/*Do some basic optimization actions on the tokens before code generation*/
+int optimize_tokens(token *tokens, int t);
+
+/*Checks if an integer is power for two from 0 to 10*/
+inline int is_power_of_2 (int x);
+
+/*Return shift equiv for power of two div or mul*/
+int shift_times (int x);
+
 int main (int argc, char *argv[]) {
 	char buffer[10000];
 	token tokens[500];
@@ -84,6 +93,9 @@ int main (int argc, char *argv[]) {
 	
 	/*syntax analysis*/
 	t = analize_tokens(tokens, t);
+	
+	/*optimization*/
+	t = optimize_tokens(tokens, t);
 	
 /*	Print tokens and errors for debugging*/
 	print_tokens(tokens, t);
@@ -340,12 +352,72 @@ int analize_tokens(token *tokens, int t) {
 }
 
 
+int optimize_tokens(token *tokens, int t) {
+	int i, z, k;
+	token tokens_tmp[500];
 
+	/*Drop all lines before last '* 0'*/
+	for (i = 0, z = -1; i < t; ++i) {
+		if (tokens[i].operation == t_mul && tokens[i].type == literal && tokens[i].data.value == 0) {
+			z = i;
+			break;
+		}
+	}
 
+	/*Drop '+ 0', '- 0', '* 1', '/ 1' tokens*/
+	for (i = z + 1, k = 0; i < t; ++i) { //and start after the last '* 0'
+		if (!(tokens[i].type == literal && 
+			(
+				(tokens[i].data.value == 0 && (tokens[i].operation == t_plus || tokens[i].operation == t_min)) ||
+				(tokens[i].data.value == 1 && (tokens[i].operation == t_mul || tokens[i].operation == t_div))
+			)
+		)) {
+			tokens_tmp[k++] = tokens[i];
+		}
+	}
+	t = k; // update tokens counter
 
+	/*update tokens array*/
+	for (i = 0; i < t; ++i) {
+		tokens[i] = tokens_tmp[i];
+	}
+	
+	/*Convert divs and muls with powers of two to shifts*/
+	for (i = 0; i < t; ++i) {
+		if (tokens[i].type == literal && tokens[i].operation == t_mul && is_power_of_2(tokens[i].data.value)) {
+			tokens[i].operation = t_shl;
+			tokens[i].data.value = shift_times(tokens[i].data.value);
+		}
+		
+		else if (tokens[i].type == literal && tokens[i].operation == t_div && is_power_of_2(tokens[i].data.value)) {
+			tokens[i].operation = t_shr;
+			tokens[i].data.value = shift_times(tokens[i].data.value);
+		}
+	}
 
+	return t;
+}
 
+/*Checks if an integer is power for two from 0 to 10*/
+inline int is_power_of_2 (int x) {
+	if (x == 1 || x == 2 || x == 4 || x == 8 || x == 16 || x == 32 || x == 64 || x == 128 || x == 256 || x == 512 || x == 1024) {
+		return 1;
+	}
+	return 0;
+}
 
+/*Return shift equiv for power of two div or mul*/
+int shift_times (int x) {
+	int i, k;
+	for (i = 1, k = 0; i < x; i *= 2, ++k);
+
+	if (i == x) { //if x was a valid power of 2, after the end of the for loop
+		return k; //the i must be equal with x, in that case return k
+	}
+	else {
+		return -1; //else return -1 to indicate wrong input
+	}
+}
 
 
 
