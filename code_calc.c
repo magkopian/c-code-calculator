@@ -4,7 +4,7 @@
 #include <string.h>
 #include <errno.h>
 
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 
 #define VALINE "^[ ]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\)\\([ ]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ ]\\+[a-z]\\)\\|\\([=]\\)\\)[ ]*$"
 #define BRACKET 1
@@ -15,7 +15,7 @@ int error_cnt = 0;
 int removed_lines = 1; //set it to 1 and not 0 because for user first line is 1
 
 /*******************************************************
-* Valid tokens operations:                             *
+* Valid tokens operations (that can a user use):       *
 *                                                      *
 * Type variable: t_plus, t_min, t_mul, t_div, t_assign *
 * Type literal: t_plus, t_min, t_mul, t_div            *
@@ -29,7 +29,7 @@ typedef enum {t_plus = 200, t_min, t_mul, t_div, t_shl, t_shr, t_assign, t_end} 
 /*Token struct declaration*/
 typedef struct {
 	token_type type; //variable | literal | eop
-	token_operation operation; //t_plus | t_min | t_mul | t_div | t_assign | t_end
+	token_operation operation; //t_plus | t_min | t_mul | t_div | t_shl | t_shr | t_assign | t_end
 	union {
 		int value; //for literals only
 		char name; //for variables only
@@ -74,6 +74,9 @@ void token_to_code (token tkn, char *code_token, int put_bracket);
 
 /*Generates the assignments lines of the C code*/
 int generate_assignments (token *tokens, int t, char *assign_buff);
+
+/*Save users code on an output file*/
+int save_code(char *buffer, char *fname);
 
 int main (int argc, char *argv[]) {
 	char buffer[10000];
@@ -156,6 +159,17 @@ int main (int argc, char *argv[]) {
 	/*Print errors buffer*/
 	if (error_cnt != 0) {
 		puts(error_buffer);
+	}
+	else {
+		puts("No Errors");
+	}
+	
+	/*Final Phase: Save the code in a file*/
+	if (argc == 4 && strcmp(argv[2], "-o") == 0) { //check if user provided output file name
+		save_code(buffer, argv[3]);
+	}
+	else {
+		save_code(buffer, "out.c");
 	}
 	
 	return 0;
@@ -354,16 +368,61 @@ token scan_one_token (char *line) {
 /*Print the tokens from a token array (for debugging usage)*/
 void print_tokens (token *tokens, int t) {
 	int i;
+	char token_char[2][100];
 	
 	for (i = 0; i < t; ++i) {
+		/*Convert token type to string*/
+		switch (tokens[i].type) {
+			case variable:
+				strcpy(token_char[0], "variable");
+				break;
+			case literal:
+				strcpy(token_char[0], "literal");
+				break;
+			case eop:
+				strcpy(token_char[0], "eop");
+				break;
+			case invalid:
+				strcpy(token_char[0], "invalid");
+				break;
+		}
+
+		/*Convert token operation to string*/
+		switch (tokens[i].operation) {
+			case t_plus:
+				strcpy(token_char[1], "t_plus");
+				break;
+			case t_min:
+				strcpy(token_char[1], "t_min");
+				break;
+			case t_mul:
+				strcpy(token_char[1], "t_mul");
+				break;
+			case t_div:
+				strcpy(token_char[1], "t_div");
+				break;
+			case t_shr:
+				strcpy(token_char[1], "t_shr");
+				break;
+			case t_shl:
+				strcpy(token_char[1], "t_shl");
+				break;
+			case t_assign:
+				strcpy(token_char[1], "t_assign");
+				break;
+			case t_end:
+				strcpy(token_char[1], "t_end");
+				break;
+		}
+	
 		if (tokens[i].type == literal) {
-			printf("type=%d operation=%d data=%d\n", tokens[i].type, tokens[i].operation, tokens[i].data.value);
+			printf("type: %s\toperation: %s\tdata: %d\n", token_char[0], token_char[1], tokens[i].data.value);
 		}
 		else if (tokens[i].type == variable) {
-			printf("type=%d operation=%d data=%c\n", tokens[i].type, tokens[i].operation, tokens[i].data.name);
+			printf("type: %s\toperation: %s\tdata: %c\n", token_char[0], token_char[1], tokens[i].data.name);
 		}
 		else {
-			printf("type=%d operation=%d\n", tokens[i].type, tokens[i].operation);
+			printf("type: %s\toperation: %s\n", token_char[0], token_char[1]);
 		}
 	}
 }
@@ -676,7 +735,27 @@ int generate_code (char *buffer, token *tokens, int t) {
 	return 1;
 }
 
+/*Save users code on an output file*/
+int save_code(char *buffer, char *fname) {
+	FILE *fp;
+	
+	if ((fp = fopen(fname, "w")) == NULL) { //if failed with fname provided by the user
+		puts("Problem with provided output file name:");
+		puts(strerror(errno));
+		strcpy(fname, "out.c");
+		
+		if ((fp = fopen(fname, "w")) == NULL) { //try again with out.c
+			puts(strerror(errno));
+			return 0;
+		}
+	}
 
+	fputs(buffer, fp);
+	fclose(fp);
+
+	printf("File %s has been created.\n", fname);
+	return 1;
+}
 
 
 
