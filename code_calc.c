@@ -471,7 +471,7 @@ int analize_tokens (token *tokens, int t) {
 	}
 	else if (t > i + 1) { //then we have unreachable code at position i + 1
 		//log the error to the global error buffer
-		sprintf(&error_buffer[error_cnt], "%d: error: unreachable code detected\n", i + removed_lines + 1);
+		sprintf(&error_buffer[error_cnt], "%d: warning: unreachable code detected\n", i + removed_lines + 1);
 		error_cnt += strlen(&error_buffer[error_cnt]);
 		
 		t = i + 1; //drop the unreachable code
