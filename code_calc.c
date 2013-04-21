@@ -5,6 +5,8 @@
 #include <errno.h>
 
 #define VALINE "^[ ]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\)\\([ ]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ ]\\+[a-z]\\)\\|\\([=]\\)\\)[ ]*$"
+#define BRACKET 1
+#define NO_BRACKET 0
 
 char error_buffer[2000];
 int error_cnt = 0;
@@ -66,7 +68,7 @@ int shift_times (int x);
 int generate_code (char *buffer, token *tokens, int t);
 
 /*Convert a token to code*/
-void token_to_code(token tkn, char *code_token);
+void token_to_code(token tkn, char *code_token, int put_bracket);
 
 int main (int argc, char *argv[]) {
 	char buffer[10000];
@@ -432,6 +434,7 @@ int shift_times (int x) {
 int generate_code (char *buffer, token *tokens, int t) {
 	int i, j;
 	int last_assign = 0;
+	int last_assign_with_data = -1;
 	int a = 0; //assignment counter
 	int k = 0; //assignment counter 
 	char assignments[500][256];
@@ -441,45 +444,61 @@ int generate_code (char *buffer, token *tokens, int t) {
 	for (i = 0; i < t; ++i) {
 		if (tokens[i].operation == t_assign) { //then assign it, all the above tokens
 			
-			if (tokens[i].data.name != '$') {
+			/*Begin the assignment line with the variable*/
+			if (tokens[i].data.name != '$') { //if we have an ordinary variable
 				assignments[a][k++] = tokens[i].data.name;
 			}
 			else {
-				strcpy(&assignments[a][k], "result");
+				strcpy(&assignments[a][k], "result"); //if we reached the default variable
 				k += strlen(&assignments[a][k]);
 			}
 			
-			strcpy(&assignments[a][k], " = ");
-			k += strlen(&assignments[a][k]);
+			/*Next we have the assign operator*/
+			assignments[a][k++] = ' ';
+			assignments[a][k++] = '=';
+			assignments[a][k++] = ' ';
 			
-			for (j = last_assign; j < i; ++j) {
-				assignments[a][k++] = '(';
-			}
+			/*Put as many brackets on the start as the total operations in the assignment - 1*/
+			for (j = last_assign; j + 1 < i; ++j, assignments[a][k++] = '(');
 			
+			/*If we have don't have +- at the start of the assignment put a zero*/
 			if (j != last_assign && tokens[last_assign].operation != t_plus && tokens[last_assign].operation != t_min) {
 				assignments[a][k++] = '0';
 			}
 			
-			
+			/*Convert the tokens to code*/
 			for (j = last_assign; j < i; ++j) {
-				token_to_code(tokens[j], code_token);
+				if (j != i - 1) {
+					token_to_code(tokens[j], code_token, BRACKET); //if not the last operation put bracket
+				}
+				else {
+					token_to_code(tokens[j], code_token, NO_BRACKET); //don't put bracket to the last operation
+				}
+				
 				strcpy(&assignments[a][k], code_token);
 				k += strlen(&assignments[a][k]);
 			}
-			
-			j = last_assign;
-			
-			if (j >= i) { //in case of two assignment in a row
-				strcpy(&assignments[a][k], "(0)");
-				k += strlen(&assignments[a][k]);
+
+			/*If the assignment has no operation in it*/
+			if (last_assign >= i) { //this happens when we have 2 '= variable' in a row inside the code
+				assignments[a][k++] = '0';
+			}
+			else {
+				last_assign_with_data = a; //detect the last assignment with data
 			}
 			
-			assignments[a][k++] = ';';
+			/*Put the semicolon at the end of the assignment*/
+			assignments[a++][k] = ';';
 			
-			++a;
 			k = 0;
 			last_assign = i + 1;
 		}
+	}
+	
+	/*If we have assignments without data, put the last assignment with data in the result variable*/
+	if (last_assign_with_data != -1 && last_assign_with_data != a - 1) {
+		k = strlen(assignments[a-1]);
+		assignments[a-1][k-2] = assignments[last_assign_with_data][0];
 	}
 	
 	for (i = 0; i < a; ++i) {
@@ -489,7 +508,7 @@ int generate_code (char *buffer, token *tokens, int t) {
 }
 
 /*Convert a token to code*/
-void token_to_code(token tkn, char *code_token) {
+void token_to_code(token tkn, char *code_token, int put_bracket) {
 	int i = 0;
 	
 	switch (tkn.operation) {
@@ -523,7 +542,10 @@ void token_to_code(token tkn, char *code_token) {
 		code_token[i++] = tkn.data.name;
 	}
 	
-	code_token[i++] = ')';
+	if (put_bracket) {
+		code_token[i++] = ')';
+	}
+	
 	code_token[i++] = '\0';
 }
 
