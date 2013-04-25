@@ -6,7 +6,7 @@
 
 #define DEBUG_MODE 0
 
-#define VALINE "^[ 	]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\)\\([ 	]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ 	]\\+[a-z]\\)\\|\\([=]\\)\\)[ 	]*$"
+#define VALINE "^[ 	]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\|[%]\\)\\([ 	]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ 	]\\+[a-z]\\)\\|\\([=]\\)\\)[ 	]*$"
 #define BRACKET 1
 #define NO_BRACKET 0
 
@@ -14,17 +14,17 @@ char error_buffer[2000];
 int error_cnt = 0;
 int removed_lines = 1; //set it to 1 and not 0 because for user first line is 1
 
-/*******************************************************
-* Valid tokens operations (that can a user use):       *
-*                                                      *
-* Type variable: t_plus, t_min, t_mul, t_div, t_assign *
-* Type literal: t_plus, t_min, t_mul, t_div            *
-* Type eop: t_end                                      *
-********************************************************/
+/**************************************************************
+* Valid tokens operations (that can a user use):              *
+*                                                             *
+* Type variable: t_plus, t_min, t_mul, t_div, t_mod, t_assign *
+* Type literal: t_plus, t_min, t_mul, t_div, t_mod            *
+* Type eop: t_end                                             *
+***************************************************************/
 
 /*Valid token type and token operation declaration*/
 typedef enum {variable = 100, literal, eop, invalid} token_type;
-typedef enum {t_plus = 200, t_min, t_mul, t_div, t_shl, t_shr, t_assign, t_end} token_operation;
+typedef enum {t_plus = 200, t_min, t_mul, t_div, t_mod, t_shl, t_shr, t_assign, t_end} token_operation;
 
 /*Token struct declaration*/
 typedef struct {
@@ -339,6 +339,9 @@ token scan_one_token (char *line) {
 		case '/':
 			tkn.operation = t_div;
 			break;
+		case '%':
+			tkn.operation = t_mod;
+			break;
 		case '=':
 			tkn.operation = t_assign; //or t_end we will find out later
 			break;
@@ -408,6 +411,9 @@ void print_tokens (token *tokens, int t) {
 			case t_div:
 				strcpy(token_char[1], "t_div");
 				break;
+			case t_mod:
+				strcpy(token_char[1], "t_mod");
+				break;
 			case t_shr:
 				strcpy(token_char[1], "t_shr");
 				break;
@@ -441,7 +447,7 @@ int analize_tokens (token *tokens, int t) {
 	
 	/*Detect division by zero*/
 	for (i = 0; i < t; ++i) {
-		if (tokens[i].type == literal && tokens[i].operation == t_div && tokens[i].data.value == 0) {
+		if (tokens[i].type == literal && (tokens[i].operation == t_div || tokens[i].operation == t_mod) && tokens[i].data.value == 0) {
 			//log the warning to the global error buffer
 			sprintf(&error_buffer[error_cnt], "%d: warning: division by zero\n", i + removed_lines);
 			error_cnt += strlen(&error_buffer[error_cnt]);
@@ -683,6 +689,9 @@ void token_to_code(token tkn, char *code_token, int put_bracket) {
 			break;
 		case t_div:
 			code_token[i++] = '/';
+			break;
+		case t_mod:
+			code_token[i++] = '%';
 			break;
 		case t_shl:
 			code_token[i++] = '<';
