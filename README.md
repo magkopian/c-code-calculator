@@ -25,7 +25,7 @@
 		</p>
 		
 		<p>
-			<code>
+			<pre>
 			+ 9		/*result = 0 + 9*/
 			- 7 	/*result = result - 7*/
 			/ 4		/*result = result / 4*/
@@ -37,7 +37,7 @@
 			- b 	/*result = result + b*/
 			= c		/*result = c*/
 			=		/*EOP*/
-			</code>
+			</pre>
 		</p>
 		
 		<h3>Output Program Example:</h3>
@@ -47,21 +47,21 @@
 		</p>
 		
 		<p>
-			<code>
-			#include &lt;stdio.h&rt;
-			#include &lt;stdlib.h&rt;
+			<pre>
+			#include <stdio.h>
+			#include <stdlib.h>
 
 			int main(void) {
 				int a, b, c, result;
 
-				a = ((+9)-7)&rt;&rt;2;				/*the translation of the first four operations*/
-				b = (0&lt;&lt;1)-7;					/*the translation of the next three operations*/
+				a = ((+9)-7)>>2;					/*the translation of the first four operations*/
+				b = (0<<1)-7;						/*the translation of the next three operations*/
 				c = (+a)-b;							/*the translation of the next three operations*/
 				result = c;							/*the last variable is assigned to the default variable*/
 				printf("Result = %d\n", result);	/*print the default variable*/
 				return 0;
 			}
-			</code>
+			</pre>
 		</p>
 		
 		<p>
@@ -71,7 +71,7 @@
 		</p>
 		
 		<p>
-		Also, you may noticed that instead of "a = ((+9)-7)/4", you get "a = ((+9)-7)&rt;&rt;2", that is because the translator 
+		Also, you may noticed that instead of "a = ((+9)-7)/4", you get "a = ((+9)-7)>>2", that is because the translator 
 		does also code optimization.
 		</p>
 		
@@ -79,23 +79,23 @@
 		
 		<p>
 		To compile the C-only version, you just run: <br>
-		<code>gcc -o code_calc code_calc.c</code><br>
+		<pre>gcc -o code_calc code_calc.c</pre><br>
 		For this to work, the gcc compiler have to be installed.
 		</p>
 		
 		<p>
 		For the Flex version: <br>
-		<code>Flex -o Flex_code_calc.c Flex_code_calc.l</code><br>
-		<code>gcc -o Flex_code_calc Flex_code_calc.c -lfl</code><br>
+		<pre>Flex -o Flex_code_calc.c Flex_code_calc.l</pre><br>
+		<pre>gcc -o Flex_code_calc Flex_code_calc.c -lfl</pre><br>
 		For this to work, the gcc compiler and the Flex Lexical Analyzer Generator have to be installed.
 		</p>
 		
 		<h3>Usage:</h3>
 		<p>
 		In order to use the program, you just run: <br>
-		<code>./code_calc "input_file" -o "output_file.c"</code><br>
+		<pre>./code_calc <input_file> -o <output_file.c></pre><br>
 		or<br>
-		<code>./code_calc "input_file"</code><br>
+		<pre>./code_calc <input_file></pre><br>
 		In the first case, a C file with a user specified name will be created. In the second case, the program will create
 		an output file with the name out.c.
 		</p>
