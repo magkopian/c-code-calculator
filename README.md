@@ -25,7 +25,7 @@
 		</p>
 		
 		<p>
-			<pre>
+			
 			+ 9		/*result = 0 + 9*/
 			- 7 	/*result = result - 7*/
 			/ 4		/*result = result / 4*/
@@ -37,7 +37,7 @@
 			- b 	/*result = result + b*/
 			= c		/*result = c*/
 			=		/*EOP*/
-			</pre>
+			
 		</p>
 		
 		<h3>Output Program Example:</h3>
@@ -47,7 +47,7 @@
 		</p>
 		
 		<p>
-			<pre>
+			
 			#include <stdio.h>
 			#include <stdlib.h>
 
@@ -61,7 +61,7 @@
 				printf("Result = %d\n", result);	/*print the default variable*/
 				return 0;
 			}
-			</pre>
+			
 		</p>
 		
 		<p>
@@ -79,23 +79,23 @@
 		
 		<p>
 		To compile the C-only version, you just run: <br>
-		<pre>gcc -o code_calc code_calc.c</pre><br>
+		gcc -o code_calc code_calc.c<br>
 		For this to work, the gcc compiler have to be installed.
 		</p>
 		
 		<p>
 		For the Flex version: <br>
-		<pre>Flex -o Flex_code_calc.c Flex_code_calc.l</pre><br>
-		<pre>gcc -o Flex_code_calc Flex_code_calc.c -lfl</pre><br>
+		Flex -o Flex_code_calc.c Flex_code_calc.l<br>
+		gcc -o Flex_code_calc Flex_code_calc.c -lfl<br>
 		For this to work, the gcc compiler and the Flex Lexical Analyzer Generator have to be installed.
 		</p>
 		
 		<h3>Usage:</h3>
 		<p>
 		In order to use the program, you just run: <br>
-		<pre>./code_calc <input_file> -o <output_file.c></pre><br>
+		./code_calc <input_file> -o <output_file.c><br>
 		or<br>
-		<pre>./code_calc <input_file></pre><br>
+		./code_calc <input_file><br>
 		In the first case, a C file with a user specified name will be created. In the second case, the program will create
 		an output file with the name out.c.
 		</p>
