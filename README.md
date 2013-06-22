@@ -57,11 +57,11 @@ Next, it follows the output of the previous example code. Note also here, that t
 	int main(void) {
 		int a, b, c, result;
 
-		a = ((+9)-7)&gt;&gt;2;					/*the translation of the first four operations*/
-		b = (0&lt;&lt;1)-7;						/*the translation of the next three operations*/
-		c = (+a)-b;							/*the translation of the next three operations*/
-		result = c;							/*the last variable is assigned to the default variable*/
-		printf("Result = %d\n", result);	/*print the default variable*/
+		a = ((+9)-7)&gt;&gt;2;				/*the translation of the first four operations*/
+		b = (0&lt;&lt;1)-7;				/*the translation of the next three operations*/
+		c = (+a)-b;				/*the translation of the next three operations*/
+		result = c;				/*the last variable is assigned to the default variable*/
+		printf("Result = %d\n", result);				/*print the default variable*/
 		return 0;
 	}
 	</pre>
