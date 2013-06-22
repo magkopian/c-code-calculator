@@ -1,4 +1,12 @@
 %{
+/***************************************************************\
+* Copyright (c) 2013 Manolis Agkopian                           *
+* See the file LICENCE for copying permission.                  *
+*                                                               *
+* THIS IS JUST SOME TEST CODE THA USES THE LCD DRIVER TO PRINT  *
+* THE NUMBERS FROM 0 TO 9 TO THE LCD WITH A DELAY               *
+\***************************************************************/
+
 	#include <regex.h>
 	#include <stdio.h>
 	#include <stdlib.h>  
@@ -6,7 +14,7 @@
 	#include <errno.h>
 	
 	
-	#define DEBUG_MODE 1
+	#define DEBUG_MODE 0
 
 
 	#define VALINE "^[ 	]*\\(\\(\\([*]\\|[+]\\|[-]\\|[/]\\|[%]\\)\\([ 	]\\+\\)\\(\\([0-9]\\+\\)\\|\\([a-z]\\)\\)\\)\\|\\([=][ 	]\\+[a-z]\\)\\|\\([=]\\)\\)[ 	]*$"
