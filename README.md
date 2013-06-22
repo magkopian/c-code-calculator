@@ -48,14 +48,14 @@
 		
 		<p>
 			<code>
-			#include <stdio.h>
-			#include <stdlib.h>
+			#include &lt;stdio.h&rt;
+			#include &lt;stdlib.h&rt;
 
 			int main(void) {
 				int a, b, c, result;
 
-				a = ((+9)-7)>>2;					/*the translation of the first four operations*/
-				b = (0<<1)-7;						/*the translation of the next three operations*/
+				a = ((+9)-7)&rt;&rt;2;				/*the translation of the first four operations*/
+				b = (0&lt;&lt;1)-7;					/*the translation of the next three operations*/
 				c = (+a)-b;							/*the translation of the next three operations*/
 				result = c;							/*the last variable is assigned to the default variable*/
 				printf("Result = %d\n", result);	/*print the default variable*/
@@ -71,7 +71,7 @@
 		</p>
 		
 		<p>
-		Also, you may noticed that instead of "a = ((+9)-7)/4", you get "a = ((+9)-7)>>2", that is because the translator 
+		Also, you may noticed that instead of "a = ((+9)-7)/4", you get "a = ((+9)-7)&rt;&rt;2", that is because the translator 
 		does also code optimization.
 		</p>
 		
@@ -93,9 +93,9 @@
 		<h3>Usage:</h3>
 		<p>
 		In order to use the program, you just run: <br>
-		<code>./code_calc <input_file> -o <output_file.c></code><br>
+		<code>./code_calc "input_file" -o "output_file.c"</code><br>
 		or<br>
-		<code>./code_calc <input_file></code><br>
+		<code>./code_calc "input_file"</code><br>
 		In the first case, a C file with a user specified name will be created. In the second case, the program will create
 		an output file with the name out.c.
 		</p>
