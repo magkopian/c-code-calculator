@@ -79,7 +79,7 @@ does also code optimization.
 
 <p>
 To compile the C-only version, you just run: <br>
-gcc -o code_calc code_calc.c<br>
+<code>gcc -o code_calc code_calc.c</code><br>
 For this to work, the gcc compiler have to be installed.
 </p>
 
@@ -93,9 +93,9 @@ For this to work, the gcc compiler and the Flex Lexical Analyzer Generator have 
 <h3>Usage:</h3>
 <p>
 In order to use the program, you just run: <br>
-./code_calc &lt;input_file&gt; -o &lt;output_file.c&gt;<br>
+<code>./code_calc &lt;input_file&gt; -o &lt;output_file.c&gt;</code><br>
 or<br>
-./code_calc &lt;input_file&gt;<br>
+<code>./code_calc &lt;input_file&gt;</code><br>
 In the first case, a C file with a user specified name will be created. In the second case, the program will create
 an output file with the name out.c.
 </p>
