@@ -100,8 +100,8 @@ In order to use the program, you just run:
 </p>
 
 <p>
-<code>./code_calc &lt;input_file&gt; -o &lt;output_file.c&gt;</code><br><br>
-or<br><br>
+<code>./code_calc &lt;input_file&gt; -o &lt;output_file.c&gt;</code><br>
+or<br>
 <code>./code_calc &lt;input_file&gt;</code>
 </p>
 
