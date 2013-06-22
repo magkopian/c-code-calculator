@@ -89,8 +89,8 @@ For this to work, the gcc compiler have to be installed.
 
 <p>
 For the Flex version: <br>
-Flex -o Flex_code_calc.c Flex_code_calc.l<br>
-gcc -o Flex_code_calc Flex_code_calc.c -lfl<br>
+<code>Flex -o Flex_code_calc.c Flex_code_calc.l</code><br>
+<code>gcc -o Flex_code_calc Flex_code_calc.c -lfl</code><br>
 For this to work, the gcc compiler and the Flex Lexical Analyzer Generator have to be installed.
 </p>
 
