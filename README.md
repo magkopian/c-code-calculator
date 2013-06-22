@@ -25,7 +25,7 @@ I only use them in this readme file to explain each program line.
 </p>
 
 <p>
-	<code>
+
 	<pre>
 	+ 9		/*result = 0 + 9*/
 	- 7 	/*result = result - 7*/
@@ -39,7 +39,7 @@ I only use them in this readme file to explain each program line.
 	= c		/*result = c*/
 	=		/*EOP*/
 	</pre>
-	</code>
+
 </p>
 
 <h3>Output Program Example:</h3>
@@ -49,7 +49,7 @@ Next, it follows the output of the previous example code. Note also here, that t
 </p>
 
 <p>
-	<code>
+
 	<pre>
 	#include &lt;stdio.h&gt;
 	#include &lt;stdlib.h&gt;
@@ -65,7 +65,7 @@ Next, it follows the output of the previous example code. Note also here, that t
 		return 0;
 	}
 	</pre>
-	</code>
+
 </p>
 
 <p>
