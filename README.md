@@ -75,7 +75,7 @@ variable will have the total result of all the operations.
 </p>
 
 <p>
-Also, you may noticed that instead of "a = ((+9)-7)/4", you get "a = ((+9)-7)>>2", that is because the translator 
+Also, you may noticed that instead of <code>a = ((+9)-7)/4</code>, you get <code>a = ((+9)-7)>>2</code>, that is because the translator 
 does also code optimization.
 </p>
 
