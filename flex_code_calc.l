@@ -1,5 +1,6 @@
 %{
 /***************************************************************\
+*                                                               *
 * Copyright (c) 2013 Manolis Agkopian                           *
 * See the file LICENCE for copying permission.                  *
 *                                                               *
@@ -23,21 +24,21 @@
 	#define yyterminate() return(end_of_file) //overwrite the default behavior of yyterminate() that returns 0
 
 	/*Used by yylex to find the value of a literal type token inside the yytext*/
-	#define find_value(line)												\
-	do {																	\
-		for (macro_cnt = 0; line[macro_cnt] != '\0'; ++macro_cnt) {			\
-			if (line[macro_cnt] >= '0' && line[macro_cnt] <= '9') break;	\
-		} 																	\
-		macro_literal_value = atoi(&line[macro_cnt]); 						\
+	#define find_value(line)                                                \
+	do {                                                                    \
+		for (macro_cnt = 0; line[macro_cnt] != '\0'; ++macro_cnt) {         \
+			if (line[macro_cnt] >= '0' && line[macro_cnt] <= '9') break;    \
+		}                                                                   \
+		macro_literal_value = atoi(&line[macro_cnt]);                       \
 	} while (0)
 	
 	/*Used by yylex to find the name of a variable type token inside the yytext*/
-	#define find_name(line)													\
-	do {																	\
-		for (macro_cnt = yyleng; macro_cnt >= 0; --macro_cnt) {				\
-			if (line[macro_cnt] >= 'a' && line[macro_cnt] <= 'z') break;	\
-		} 																	\
-		macro_variable_name = line[macro_cnt]; 								\
+	#define find_name(line)                                                 \
+	do {                                                                    \
+		for (macro_cnt = yyleng; macro_cnt >= 0; --macro_cnt) {             \
+			if (line[macro_cnt] >= 'a' && line[macro_cnt] <= 'z') break;    \
+		}                                                                   \
+		macro_variable_name = line[macro_cnt];                              \
 	} while (0)
 	
 	
@@ -136,9 +137,9 @@ WSP [ \t]
 {WSP}*[/]{WSP}+{VAR}{WSP}*	{token tkn; tkn.type = variable; tkn.operation = t_div; find_name(yytext); tkn.data.name = VAR_NAME; return tkn;}
 {WSP}*[%]{WSP}+{VAR}{WSP}*	{token tkn; tkn.type = variable; tkn.operation = t_mod; find_name(yytext); tkn.data.name = VAR_NAME; return tkn;}
 {WSP}*[=]{WSP}+{VAR}{WSP}*	{token tkn; tkn.type = variable; tkn.operation = t_assign; find_name(yytext); tkn.data.name = VAR_NAME; return tkn;}
-{WSP}*[=]{WSP}*				{token tkn; tkn.type = eop; tkn.operation = t_end; return tkn;}
-{WSP}*						{}
-.*							{token tkn; tkn.type = invalid; return tkn;}
+{WSP}*[=]{WSP}*			{token tkn; tkn.type = eop; tkn.operation = t_end; return tkn;}
+{WSP}*				{}
+.*				{token tkn; tkn.type = invalid; return tkn;}
 %%
 int main (int argc, char *argv[]) {
 	char buffer[10000];
