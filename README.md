@@ -118,3 +118,7 @@ changing the DEBUG_MODE define to 1.
 </p>
 </body>
 </html>
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/magkopian/c-code-calculator/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
