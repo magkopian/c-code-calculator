@@ -14,17 +14,17 @@ Next, it follows an example program of the input language. Note though, that cur
 I only use them in this readme file to explain each program line.
 
 ```
-+ 9		/*result = 0 + 9*/
++ 9	/*result = 0 + 9*/
 - 7 	/*result = result - 7*/
-/ 4		/*result = result / 4*/
-= a		/*a = result*/
-* 2		/*result = 0 * 2*/
+/ 4	/*result = result / 4*/
+= a	/*a = result*/
+* 2	/*result = 0 * 2*/
 - 7 	/*result = result - 7*/
-= b		/*b = result*/
-+ a		/*result = 0 + a*/
+= b	/*b = result*/
++ a	/*result = 0 + a*/
 - b 	/*result = result + b*/
-= c		/*result = c*/
-=		/*EOP*/
+= c	/*result = c*/
+=	/*EOP*/
 ```
 
 ## Output Program Example:
@@ -37,10 +37,10 @@ Next, it follows the output of the previous example code. Note also here, that t
 int main(void) {
 	int a, b, c, result;
 
-	a = ((+9)-7)>>2;					/*the translation of the first four operations*/
-	b = (0<<1)-7;						/*the translation of the next three operations*/
-	c = (+a)-b;							/*the translation of the next three operations*/
-	result = c;							/*the last variable is assigned to the default variable*/
+	a = ((+9)-7)>>2;			/*the translation of the first four operations*/
+	b = (0<<1)-7;				/*the translation of the next three operations*/
+	c = (+a)-b;				/*the translation of the next three operations*/
+	result = c;				/*the last variable is assigned to the default variable*/
 	printf("Result = %d\n", result);	/*print the default variable*/
 	return 0;
 }
@@ -85,4 +85,3 @@ If the translator encounter any errors, it will display the apropriate error mes
 translation process. Any lines that contain errors will just be ignored and the translation will be done without them.
 To get detailed information on how the translator processes the input code, you can enable the debugging mode by 
 changing the DEBUG_MODE define to 1.
-
